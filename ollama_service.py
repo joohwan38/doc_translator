@@ -33,7 +33,6 @@ class OllamaService(AbsOllamaService):
         return self._url
 
     def is_installed(self) -> bool:
-        # (이전 코드와 동일)
         try:
             if shutil.which('ollama'):
                 logger.debug("Ollama found in PATH via shutil.which")
@@ -42,7 +41,8 @@ class OllamaService(AbsOllamaService):
             if system == "Windows":
                 paths_to_check = [
                     "C:\\Program Files\\Ollama\\ollama.exe",
-                    os.path.expanduser("~\\AppData\\Local\\Ollama\\ollama.exe")
+                    os.path.expanduser("~\\AppData\\Local\\Ollama\\ollama.exe"),
+                    os.path.expanduser("~\\AppData\\Local\\Programs\\Ollama\\ollama.exe")
                 ]
                 for path in paths_to_check:
                     if os.path.exists(path):
@@ -52,6 +52,7 @@ class OllamaService(AbsOllamaService):
                 paths_to_check = [
                     "/usr/local/bin/ollama",
                     "/opt/homebrew/bin/ollama",
+                    "/Applications/Ollama.app/Contents/MacOS/ollama",
                     "/Applications/Ollama.app/Contents/Resources/ollama"
                 ]
                 for path in paths_to_check:
@@ -75,11 +76,10 @@ class OllamaService(AbsOllamaService):
             logger.error(f"Ollama 설치 확인 오류: {e}", exc_info=True)
             return False
 
-
     def is_running(self) -> Tuple[bool, Optional[str]]:
-        # (이전 코드와 동일)
         try:
-            response = requests.get(f"{self.url}/api/tags", timeout=self.connect_timeout)
+            # API 엔드포인트 변경: /api/tags -> /
+            response = requests.get(f"{self.url}/", timeout=self.connect_timeout)
             if response.status_code == 200:
                 port = self.url.split(':')[-1].split('/')[0]
                 logger.debug(f"Ollama running, confirmed via API on port {port}")
@@ -114,7 +114,6 @@ class OllamaService(AbsOllamaService):
         return False, None
 
     def start_ollama(self) -> bool:
-        # (이전 코드와 동일)
         if not self.is_installed():
             logger.warning("Ollama가 설치되어 있지 않아 시작할 수 없습니다.")
             return False
@@ -123,7 +122,7 @@ class OllamaService(AbsOllamaService):
             logger.info("Ollama가 이미 실행 중입니다.")
             return True
         try:
-            logger.info("Ollama 시작 시도 ('ollama serve')...")
+            logger.info("Ollama 시작 시도 중 ('ollama serve')...")
             cmd = ["ollama", "serve"]
             process_options = {
                 'stdout': subprocess.DEVNULL,
@@ -151,14 +150,18 @@ class OllamaService(AbsOllamaService):
             logger.error(f"Ollama 시작 오류: {e}", exc_info=True)
             return False
 
-
     def get_text_models(self) -> List[str]:
+        """모델 목록 가져오기 (개선된 버전)"""
         current_time = time.time()
+        
+        # 캐시 확인
         if self._models_cache is not None and (current_time - self._models_cache_time < self._models_cache_ttl):
             logger.debug(f"Ollama 모델 목록 (캐시 사용, TTL: {self._models_cache_ttl}s): {self._models_cache}")
             return self._models_cache
 
         logger.debug("Ollama 모델 목록 (캐시 만료 또는 없음, 새로고침 시도)")
+        
+        # Ollama 실행 확인
         running, _ = self.is_running()
         if not running:
             logger.warning("Ollama가 실행 중이지 않아 모델 목록을 가져올 수 없습니다.")
@@ -166,62 +169,113 @@ class OllamaService(AbsOllamaService):
             self._models_cache_time = current_time
             return []
 
-        models_from_api: Optional[List[str]] = None
+        # 1. API를 통한 모델 목록 가져오기 시도
         try:
-            response = requests.get(f"{self.url}/api/tags", timeout=(self.connect_timeout, self.read_timeout))
-            response.raise_for_status()
-            models_data = response.json()
-
-            # --- 3단계: ollama_service.py 안정성 강화 ---
-            if isinstance(models_data, dict) and 'models' in models_data and isinstance(models_data['models'], list):
-                models_from_api = [
-                    model['name'] for model in models_data['models']
-                    if isinstance(model, dict) and 'name' in model
-                ]
-                logger.debug(f"Ollama 모델 목록 (API 응답): {models_from_api}")
-                self._models_cache = models_from_api
-                self._models_cache_time = current_time
-                return models_from_api
+            # 올바른 API 엔드포인트 사용
+            response = requests.get(
+                f"{self.url}/api/tags", 
+                timeout=(self.connect_timeout, self.read_timeout)
+            )
+            
+            if response.status_code == 200:
+                try:
+                    models_data = response.json()
+                    if isinstance(models_data, dict) and 'models' in models_data:
+                        models_list = models_data.get('models', [])
+                        model_names = []
+                        for model in models_list:
+                            if isinstance(model, dict) and 'name' in model:
+                                model_names.append(model['name'])
+                        
+                        if model_names:
+                            logger.debug(f"Ollama 모델 목록 (API 성공): {model_names}")
+                            self._models_cache = model_names
+                            self._models_cache_time = current_time
+                            return model_names
+                except json.JSONDecodeError as e:
+                    logger.warning(f"Ollama API 응답 JSON 파싱 오류: {e}")
             else:
-                logger.warning(f"Ollama 모델 목록 API 응답 형식이 올바르지 않음 (models 키 누락 또는 타입 오류): {models_data}")
-                # API 응답 형식 오류 시 CLI 폴백 시도
-
+                logger.warning(f"Ollama API 응답 상태 코드: {response.status_code}")
+                
         except requests.exceptions.RequestException as e:
-            logger.warning(f"Ollama 모델 목록 API 요청 중 예외 발생 (CLI 폴백 시도): {e}")
-        except json.JSONDecodeError as e:
-            logger.warning(f"Ollama 모델 목록 API 응답 JSON 디코딩 오류 (CLI 폴백 시도): {e}")
-        except Exception as e_api_general: # 예상치 못한 다른 API 관련 오류
-            logger.error(f"Ollama 모델 목록 API 처리 중 일반 오류 (CLI 폴백 시도): {e_api_general}", exc_info=True)
+            logger.warning(f"Ollama API 요청 실패: {e}")
+        except Exception as e:
+            logger.error(f"Ollama API 모델 목록 가져오기 중 오류: {e}", exc_info=True)
 
-
-        # API 호출 실패 시 CLI 폴백
+        # 2. CLI 폴백 시도
         if self.is_installed():
             try:
-                result = subprocess.run(["ollama", "list"], capture_output=True, text=True, check=False, timeout=15)
-                if result.returncode == 0:
-                    lines = result.stdout.strip().split('\n')
-                    if len(lines) > 1: # 첫 줄은 헤더
-                        cli_models = [line.split()[0] for line in lines[1:] if line.strip() and line.split()]
-                        logger.debug(f"Ollama 모델 목록 (CLI 폴백 성공): {cli_models}")
-                        self._models_cache = cli_models
-                        self._models_cache_time = current_time
-                        return cli_models
-                    else: # 헤더만 있거나 빈 응답
-                        logger.debug("Ollama list CLI 응답에 모델 정보 없음.")
+                logger.info("API 실패, CLI로 모델 목록 가져오기 시도...")
+                
+                # ollama 실행 파일 찾기
+                ollama_path = shutil.which('ollama')
+                if not ollama_path:
+                    # 수동으로 경로 찾기
+                    system = platform.system()
+                    if system == "Windows":
+                        possible_paths = [
+                            "C:\\Program Files\\Ollama\\ollama.exe",
+                            os.path.expanduser("~\\AppData\\Local\\Ollama\\ollama.exe"),
+                            os.path.expanduser("~\\AppData\\Local\\Programs\\Ollama\\ollama.exe")
+                        ]
+                    elif system == "Darwin":
+                        possible_paths = [
+                            "/usr/local/bin/ollama",
+                            "/opt/homebrew/bin/ollama",
+                            "/Applications/Ollama.app/Contents/MacOS/ollama",
+                            "/Applications/Ollama.app/Contents/Resources/ollama"
+                        ]
+                    else:
+                        possible_paths = [
+                            "/usr/local/bin/ollama",
+                            "/usr/bin/ollama"
+                        ]
+                    
+                    for path in possible_paths:
+                        if os.path.exists(path):
+                            ollama_path = path
+                            break
+                
+                if ollama_path:
+                    result = subprocess.run(
+                        [ollama_path, "list"], 
+                        capture_output=True, 
+                        text=True, 
+                        timeout=15
+                    )
+                    
+                    if result.returncode == 0 and result.stdout:
+                        lines = result.stdout.strip().split('\n')
+                        if len(lines) > 1:  # 첫 줄은 헤더
+                            cli_models = []
+                            for line in lines[1:]:
+                                if line.strip():
+                                    # 모델명은 첫 번째 컬럼
+                                    parts = line.split()
+                                    if parts:
+                                        model_name = parts[0]
+                                        # 태그 정보 제거 (예: "llama2:latest" -> "llama2:latest")
+                                        cli_models.append(model_name)
+                            
+                            if cli_models:
+                                logger.info(f"Ollama 모델 목록 (CLI 성공): {cli_models}")
+                                self._models_cache = cli_models
+                                self._models_cache_time = current_time
+                                return cli_models
+                    else:
+                        logger.warning(f"ollama list 명령 실패: {result.stderr}")
                 else:
-                    logger.warning(f"Ollama list 명령어 실행 실패 (종료 코드: {result.returncode}): {result.stderr.strip()}")
+                    logger.warning("ollama 실행 파일을 찾을 수 없습니다.")
+                    
             except subprocess.TimeoutExpired:
-                logger.warning("Ollama list 명령어 실행 시간 초과.")
-            except FileNotFoundError:
-                logger.warning("Ollama 명령어를 찾을 수 없어 CLI로 모델 목록을 가져올 수 없습니다.")
-            except Exception as e_cli:
-                logger.error(f"Ollama list 명령어 실행 중 예외 발생: {e_cli}", exc_info=True)
+                logger.warning("ollama list 명령어 실행 시간 초과.")
+            except Exception as e:
+                logger.error(f"ollama list 실행 중 오류: {e}", exc_info=True)
 
-        logger.warning("Ollama에서 모델 목록을 가져오지 못했습니다 (API 및 CLI 모두 실패). 빈 목록 반환.")
-        self._models_cache = [] # 실패 시 캐시도 비움
-        self._models_cache_time = current_time # 캐시 시간 업데이트 (반복적 시도 방지)
+        logger.warning("모델 목록을 가져올 수 없습니다. 빈 목록 반환.")
+        self._models_cache = []
+        self._models_cache_time = current_time
         return []
-
 
     def invalidate_models_cache(self):
         logger.info("Ollama 모델 목록 캐시가 수동으로 무효화되었습니다.")
@@ -231,7 +285,6 @@ class OllamaService(AbsOllamaService):
     def pull_model_with_progress(self, model_name: str,
                                  progress_callback: Optional[Callable[[str, int, int, bool], None]] = None,
                                  stop_event: Optional[threading.Event] = None) -> bool:
-        # (이전 코드와 동일 - 1단계에서 이미 로그 레벨 조정 등 반영됨)
         running, _ = self.is_running()
         if not running:
             logger.warning(f"Ollama 미실행. {model_name} 모델 다운로드 불가.")

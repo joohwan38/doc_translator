@@ -1,6 +1,5 @@
 <!DOCTYPE html>
-<html lang="ko">
-<head>
+<html lang="ko"> <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Document Translator</title>
@@ -56,7 +55,7 @@
             display: flex;
             flex-direction: column;
             align-items: flex-end;
-            min-width: 150px; /* 컨트롤 영역 최소 너비 확보 */
+            min-width: 150px; /* Ensure minimum width for controls */
         }
 
         #ui-language {
@@ -107,7 +106,7 @@
         .language-selection-area {
             display: flex;
             justify-content: space-between;
-            align-items: flex-start; /* 레이블과 드롭다운 상단 정렬 */
+            align-items: flex-start; /* Align labels and dropdowns to the top */
             gap: 10px;
         }
 
@@ -124,11 +123,8 @@
 
         .language-swap-column {
             display: flex;
-            align-items: center; 
-            /* 레이블이 있는 select의 높이에 맞춰 버튼이 중앙에 오도록 padding-top 조정 */
-            /* label font-size 0.9em + margin-bottom 3px ~= 12.6px + 3px. padding: 8px */
-            /* 대략 (12.6px + 3px + 8px(select padding)) / 2  */
-            padding-top: calc((0.9em * 1.6) + 3px); /* label 높이 + margin 만큼 위에서 밀어줌 */
+            align-items: center;
+            padding-top: calc((0.9em * 1.6) + 3px); /* Align button with select inputs */
         }
 
         #swap-lang-btn {
@@ -147,9 +143,8 @@
             font-size: 0.9em;
         }
         
-        /* input[type="file"] 스타일은 label로 대체하므로 숨김 */
         input[type="file"] {
-            display: none;
+            display: none; /* Hidden as label is used for styling */
         }
 
         select, button, input[type="range"], input[type="checkbox"]+label {
@@ -182,7 +177,7 @@
             cursor: not-allowed;
         }
 
-        .action-button {
+        .action-button { /* Style for general action buttons, if any remain */
             background-color: #6c757d;
             font-size: 0.85em;
             padding: 6px 10px;
@@ -207,7 +202,7 @@
             cursor: pointer;
         }
         
-        .file-upload-label:hover {
+        .file-upload-label.dragover-active { /* Style for drag-over state */
             background-color: #d5dbdb;
             border-color: #95a5a6;
         }
@@ -252,7 +247,12 @@
             font-size: 0.8em;
             line-height: 1.4;
         }
-        
+        .log-entry-error { color: #e74c3c; }
+        .log-entry-success { color: #27ae60; }
+        .log-entry-info { color: #f8f9fa; } /* Default log color */
+        .log-entry-warning { color: #f39c12; }
+
+
         .history-table {
             width: 100%;
             border-collapse: collapse;
@@ -294,7 +294,7 @@
         
         .tabs {
             display: flex;
-            justify-content: space-between;
+            justify-content: space-between; /* Adjusted for button removal */
             align-items: center;
             border-bottom: 2px solid #dee2e6;
             margin-bottom: 10px;
@@ -302,7 +302,7 @@
         .tab-group {
             display: flex; 
         }
-        .tab-buttons {
+        .tab-buttons { /* This div is now empty, can be removed or hidden if no other buttons are planned */
             display: flex;
         }
         
@@ -320,7 +320,6 @@
             font-weight: bold;
         }
         
-        /* 탭 컨텐츠 기본 숨김 및 활성 시 보임 */
         .tab-content {
             display: none;
         }
@@ -357,114 +356,115 @@
         <header>
             <div class="header-top-row">
                 <img src="/static/LINEstudio2.png" alt="Logo" class="logo">
-                <h1 id="app-title">Document Translator</h1>
+                <h1 id="app-title" data-i18n="app_title">Document Translator</h1>
                 <div class="header-controls">
                     <select id="ui-language"> </select>
                     <div id="server-status">
                         <span class="status-indicator status-offline"></span>
-                        <span>Ollama <span id="status-label" data-i18n="status_label">상태</span>: <span id="ollama-status" data-i18n="status_checking">확인 중...</span></span>
+                        <span>Ollama <span id="status-label" data-i18n="status_label">Status</span>: <span id="ollama-status" data-i18n="status_checking">Checking...</span></span>
                     </div>
-                </div>
-            </div>
+                    <div id="ollama-management-area" style="font-size: 0.8em; margin-top: 5px; text-align: right;"></div>
+                    <div id="model-installation-status" style="font-size: 0.8em; margin-top: 5px; text-align: right; display: none;">
+                        <span id="model-install-message"></span>
+                        <div id="model-install-progress-bar" style="background-color: #e0e0e0; border-radius: 3px; margin-top: 2px; display: none;">
+                            <div id="model-install-progress-fill" style="width: 0%; background-color: #4caf50; height: 10px; border-radius: 3px; text-align: center; line-height: 10px; font-size: 8px; color: white;">0%</div>
         </header>
         
         <div class="main-content">
             <div class="panel">
-                <h2 data-i18n="file_select_title">파일 선택</h2>
+                <h2 data-i18n="file_select_title">File Selection</h2>
                 <div class="form-group">
                     <div class="file-upload">
                         <input type="file" id="file-input" accept=".pptx">
                         <label for="file-input" class="file-upload-label" data-i18n="file_upload_label">
-                            PowerPoint 파일을 선택하거나 여기에 드래그하세요
+                            Select or drag and drop a PowerPoint file here
                         </label>
                     </div>
                 </div>
                 <div id="file-info" class="info-box" style="display: none;">
-                    <h3 data-i18n="file_info_title">파일 정보</h3>
-                    <div class="info-item"><span data-i18n="file_name_label">파일명:</span><span id="file-name">-</span></div>
-                    <div class="info-item"><span data-i18n="slide_count_label">슬라이드:</span><span id="slide-count">-</span></div>
-                    <div class="info-item"><span data-i18n="text_count_label">텍스트(자):</span><span id="text-count">-</span></div>
-                    <div class="info-item"><span data-i18n="image_count_label">이미지:</span><span id="image-count">-</span></div>
-                    <div class="info-item"><span data-i18n="chart_count_label">차트:</span><span id="chart-count">-</span></div>
+                    <h3 data-i18n="file_info_title">File Information</h3>
+                    <div class="info-item"><span data-i18n="file_name_label">Filename:</span><span id="file-name">-</span></div>
+                    <div class="info-item"><span data-i18n="slide_count_label">Slides:</span><span id="slide-count">-</span></div>
+                    <div class="info-item"><span data-i18n="text_count_label">Text (Chars):</span><span id="text-count">-</span></div>
+                    <div class="info-item"><span data-i18n="image_count_label">Images:</span><span id="image-count">-</span></div>
+                    <div class="info-item"><span data-i18n="chart_count_label">Charts:</span><span id="chart-count">-</span></div>
                 </div>
             </div>
             
             <div class="panel">
-                <h2 data-i18n="translation_options_title">번역 옵션</h2>
+                <h2 data-i18n="translation_options_title">Translation Options</h2>
                 <div class="form-group language-selection-area">
                     <div class="language-column">
-                        <label for="src-lang" data-i18n="source_language_label_short">원본 언어</label>
+                        <label for="src-lang" data-i18n="source_language_label_short">Source Language</label>
                         <select id="src-lang"></select>
                     </div>
                     <div class="language-swap-column">
-                        <button id="swap-lang-btn" title="언어 교체">↔</button>
+                        <button id="swap-lang-btn" title="Swap Languages" data-i18n-tooltip="swap_lang_button_tooltip">↔</button>
                     </div>
                     <div class="language-column">
-                        <label for="tgt-lang" data-i18n="target_language_label_short">대상 언어</label>
+                        <label for="tgt-lang" data-i18n="target_language_label_short">Target Language</label>
                         <select id="tgt-lang"></select>
                     </div>
                 </div>
                 
                 <div class="form-group">
-                    <label for="model" data-i18n="translation_model_label">번역 모델</label>
-                    <select id="model"><option value="" data-i18n="model_loading">모델 로딩 중...</option></select>
+                    <label for="model" data-i18n="translation_model_label">Translation Model</label>
+                    <select id="model"><option value="" data-i18n="model_loading">Loading models...</option></select>
                 </div>
                 
                 <div class="advanced-settings">
-                    <h3 data-i18n="advanced_settings_title">고급 설정</h3>
+                    <h3 data-i18n="advanced_settings_title">Advanced Settings</h3>
                     <div class="advanced-options-horizontal">
                         <div class="form-group checkbox-group">
                             <input type="checkbox" id="image-translation" checked>
-                            <label for="image-translation" data-i18n="image_translation_checkbox">이미지 내 텍스트 번역 (OCR)</label>
+                            <label for="image-translation" data-i18n="image_translation_checkbox">Translate text in images (OCR)</label>
                         </div>
                         <div class="form-group checkbox-group">
                             <input type="checkbox" id="ocr-gpu">
-                            <label for="ocr-gpu" data-i18n="ocr_gpu_checkbox">OCR GPU 사용</label>
+                            <label for="ocr-gpu" data-i18n="ocr_gpu_checkbox">Use OCR GPU</label>
                         </div>
                     </div>
                     <div class="form-group">
-                        <label data-i18n="ocr_temp_label">OCR 온도 (0.1 - 1.0) <span style="font-weight:normal; color: #555;" data-i18n="ocr_temp_recommended">(권장: 0.4)</span></label>
+                        <label data-i18n="ocr_temp_label">OCR Temperature (0.1 - 1.0) <span style="font-weight:normal; color: #555;" data-i18n="ocr_temp_recommended">(Recommended: 0.4)</span></label>
                         <div class="slider-group">
                             <input type="range" id="ocr-temp" class="slider" min="0.1" max="1.0" step="0.1" value="0.4">
                             <span class="slider-value" id="ocr-temp-value">0.4</span>
                         </div>
                     </div>
                 </div>
-                <button id="translate-btn" disabled data-i18n="start_translation_button">번역 시작</button>
+                <button id="translate-btn" disabled data-i18n="start_translation_button">Start Translation</button>
             </div>
             
             <div class="panel full-width" id="progress-panel" style="display: none;">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <h2 data-i18n="translation_progress_title">번역 진행률</h2>
-                    <button id="stop-translation-btn" style="display: none;" data-i18n="stop_translation_button">번역 중지</button>
+                    <h2 data-i18n="translation_progress_title">Translation Progress</h2>
+                    <button id="stop-translation-btn" style="display: none;" data-i18n="stop_translation_button">Stop Translation</button>
                 </div>
                 <div class="progress-bar"><div class="progress-fill" id="progress-fill">0%</div></div>
-                <div id="progress-status" data-i18n="status_preparing">준비 중...</div>
+                <div id="progress-status" data-i18n="status_preparing">Preparing...</div>
                 <div id="current-task" style="color: #666; font-size: 0.9em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"></div>
-                <button id="download-btn" style="display: none; margin-top: 15px;" data-i18n="download_button">번역된 파일 다운로드</button>
+                <button id="download-btn" style="display: none; margin-top: 15px;" data-i18n="download_button">Download Translated File</button>
             </div>
             
             <div class="panel full-width">
                 <div class="tabs">
-                    <div class="tab-group"> 
-                        <span class="tab active" data-tab="log" data-i18n="execution_log_tab">실행 로그</span>
-                        <span class="tab" data-tab="history" data-i18n="translation_history_tab">번역 이력</span>
+                    <div class="tab-group">
+                        <span class="tab active" data-tab="log" data-i18n="execution_log_tab">Execution Log</span>
+                        <span class="tab" data-tab="history" data-i18n="translation_history_tab">Translation History</span>
                     </div>
-                    <div class="tab-buttons"> 
-                        <button id="open-log-folder-btn" class="action-button" data-i18n="open_log_folder_button">로그 폴더</button>
-                        <button id="delete-history-btn" class="action-button" data-i18n="delete_history_button">이력 삭제</button>
-                    </div>
+                    <div class="tab-buttons">
+                        </div>
                 </div>
                 
                 <div id="log-tab" class="tab-content active">
-                    <div class="log-box" id="log-box"><span data-i18n="app_started_log">앱이 시작되었습니다...</span></div>
+                    <div class="log-box" id="log-box"><span data-i18n="app_started_log">Application started...</span></div>
                 </div>
                 
                 <div id="history-tab" class="tab-content"> <table class="history-table">
                         <thead><tr>
-                            <th data-i18n="history_col_filename">파일명</th> <th data-i18n="history_col_source">원본</th>
-                            <th data-i18n="history_col_target">대상</th> <th data-i18n="history_col_model">모델</th>
-                            <th data-i18n="history_col_status">상태</th> <th data-i18n="history_col_time">시간</th>
+                            <th data-i18n="history_col_filename">Filename</th> <th data-i18n="history_col_source">Source</th>
+                            <th data-i18n="history_col_target">Target</th> <th data-i18n="history_col_model">Model</th>
+                            <th data-i18n="history_col_status">Status</th> <th data-i18n="history_col_time">Time</th>
                         </tr></thead>
                         <tbody id="history-body"></tbody>
                     </table>
@@ -474,254 +474,563 @@
     </div>
     
     <script>
-        // 전역 변수
-        let currentFile = null;
-        let currentFilePath = null;
-        let currentTaskId = null;
-        let eventSource = null;
-        let currentUILanguage = 'ko';
-        let i18nResources = {};
-        
-        // DOM 요소 그룹
-        const 요소 = {
+        // Global variables
+        let currentFileObject = null; 
+        let currentServerFilePath = null; 
+        let currentTranslationTaskId = null;
+        let progressEventSource = null;
+        let currentUILocale = 'ko'; 
+        let i18nResources = {};     
+
+        // DOM Element References
+        const domElements = {
             fileInput: document.getElementById('file-input'),
-            fileLabel: document.querySelector('.file-upload-label'),
+            fileUploadLabel: document.getElementById('file-input').labels[0] || document.querySelector('.file-upload-label'),
             fileInfoBox: document.getElementById('file-info'),
-            fileName: document.getElementById('file-name'),
-            slideCount: document.getElementById('slide-count'),
-            textCount: document.getElementById('text-count'),
-            imageCount: document.getElementById('image-count'),
-            chartCount: document.getElementById('chart-count'),
-            srcLangSelect: document.getElementById('src-lang'),
-            tgtLangSelect: document.getElementById('tgt-lang'),
-            swapLangBtn: document.getElementById('swap-lang-btn'),
+            fileNameDisplay: document.getElementById('file-name'),
+            ollamaManagementArea: document.getElementById('ollama-management-area'),
+            modelInstallationStatus: document.getElementById('model-installation-status'),
+            modelInstallMessage: document.getElementById('model-install-message'),
+            modelInstallProgressBar: document.getElementById('model-install-progress-bar'),
+            modelInstallProgressFill: document.getElementById('model-install-progress-fill'),
+            slideCountDisplay: document.getElementById('slide-count'),
+            textCountDisplay: document.getElementById('text-count'),
+            imageCountDisplay: document.getElementById('image-count'),
+            chartCountDisplay: document.getElementById('chart-count'),
+            sourceLangSelect: document.getElementById('src-lang'),
+            targetLangSelect: document.getElementById('tgt-lang'),
+            swapLangButton: document.getElementById('swap-lang-btn'),
             modelSelect: document.getElementById('model'),
-            translateBtn: document.getElementById('translate-btn'),
+            translateButton: document.getElementById('translate-btn'),
             progressPanel: document.getElementById('progress-panel'),
             progressFill: document.getElementById('progress-fill'),
-            progressStatus: document.getElementById('progress-status'),
+            progressStatusDisplay: document.getElementById('progress-status'),
             currentTaskDisplay: document.getElementById('current-task'),
-            downloadBtn: document.getElementById('download-btn'),
+            downloadButton: document.getElementById('download-btn'),
             logBox: document.getElementById('log-box'),
-            ocrTempSlider: document.getElementById('ocr-temp'),
-            ocrTempValue: document.getElementById('ocr-temp-value'),
+            ocrTemperatureSlider: document.getElementById('ocr-temp'),
+            ocrTemperatureValueDisplay: document.getElementById('ocr-temp-value'),
             uiLanguageSelect: document.getElementById('ui-language'),
             ollamaStatusIndicator: document.querySelector('#server-status .status-indicator'),
             ollamaStatusText: document.getElementById('ollama-status'),
             ollamaStatusLabel: document.getElementById('status-label'),
-            openLogFolderBtn: document.getElementById('open-log-folder-btn'),
-            deleteHistoryBtn: document.getElementById('delete-history-btn'),
-            stopTranslationBtn: document.getElementById('stop-translation-btn'),
-            tabs: document.querySelectorAll('.tabs .tab-group .tab'), // 더 정확한 선택자
-            tabContents: document.querySelectorAll('.panel.full-width > .tab-content'), // 탭 패널 바로 아래 컨텐츠
-            historyBody: document.getElementById('history-body'),
+            stopTranslationButton: document.getElementById('stop-translation-btn'),
+            tabs: document.querySelectorAll('.tabs .tab-group .tab'),
+            tabContents: document.querySelectorAll('.panel.full-width > .tab-content'),
+            historyTableBody: document.getElementById('history-body'),
             appTitle: document.getElementById('app-title')
         };
 
-        // --- 다국어 및 UI 업데이트 함수들 ---
+        // --- Logging Function ---
+        function addLog(messageOrKey, isKey = false, type = 'info', interpolateParams = null) { 
+            if (!domElements.logBox) return;
+            const logEntry = document.createElement('div');
+            logEntry.classList.add(`log-entry-${type}`);
+            
+            let displayMessage = messageOrKey;
+            if (isKey && i18nResources && i18nResources[messageOrKey]) {
+                displayMessage = i18nResources[messageOrKey];
+                if (interpolateParams) { // Simple interpolation for {param}
+                    for (const key in interpolateParams) {
+                        displayMessage = displayMessage.replace(`{${key}}`, interpolateParams[key]);
+                    }
+                }
+            } else if (interpolateParams) { // Also interpolate for non-key messages if params provided
+                 for (const key in interpolateParams) {
+                    displayMessage = displayMessage.replace(`{${key}}`, interpolateParams[key]);
+                }
+            }
+
+
+            const timestamp = new Date().toLocaleTimeString();
+            logEntry.textContent = `[${timestamp}] ${displayMessage}`;
+            
+            domElements.logBox.appendChild(logEntry);
+            domElements.logBox.scrollTop = domElements.logBox.scrollHeight;
+        }
+        
+        // Helper function to add the default/empty model option
+        function addDefaultNoModelsOption(customTextKey = 'no_models_found') { // Takes a key now
+            if (domElements.modelSelect) {
+                domElements.modelSelect.innerHTML = ''; 
+                const option = document.createElement('option');
+                option.value = "";
+                option.textContent = (i18nResources && i18nResources[customTextKey]) || customTextKey; // Fallback to key itself
+                domElements.modelSelect.appendChild(option);
+                domElements.modelSelect.value = ""; 
+            }
+        }
+
+        // --- Localization and UI Update Functions ---
         async function loadAndSetLanguageResources(langCode) {
-            console.log(`[ linguistique ] 로드 시도: ${langCode}`);
+            console.log(`[Localization] Attempting to load: ${langCode}`);
             try {
                 const response = await fetch(`/api/ui_languages?lang=${langCode}`);
                 if (!response.ok) {
-                    console.error(`[ linguistique ] 언어 파일 로드 실패: ${response.status}`, await response.text().catch(()=>""));
-                    throw new Error(`언어 파일 로드 실패: ${response.status}`);
+                    const errorText = await response.text().catch(() => `HTTP ${response.status}`);
+                    console.error(`[Localization] Failed to load language file: ${response.status}`, errorText);
+                    throw new Error(`Failed to load language file: ${response.status}`);
                 }
                 const data = await response.json();
                 i18nResources = data.resources || {};
-                currentUILanguage = data.current_language || langCode;
-                localStorage.setItem('uiLanguagePDT', currentUILanguage);
-                document.documentElement.lang = currentUILanguage.split('-')[0];
-                console.log(`[ linguistique ] 현재 언어: ${currentUILanguage}, 리소스:`, i18nResources);
+                currentUILocale = data.current_language || langCode;
+                localStorage.setItem('uiLanguagePDT', currentUILocale); 
+                document.documentElement.lang = currentUILocale.split('-')[0]; 
+                console.log(`[Localization] Current language: ${currentUILocale}`);
                 applyLocalization();
             } catch (error) {
-                console.error('[ linguistique ] 언어 리소스 로드 중 예외:', error);
+                console.error('[Localization] Exception during language resource loading:', error);
                 i18nResources = {}; 
-                applyLocalization(); // 오류 시에도 기본값으로 UI 업데이트 시도
+                applyLocalization(); 
             }
         }
         
         function applyLocalization() {
-            console.log("[ linguistique ] 현지화 적용 시작");
+            console.log("[Localization] Applying localization...");
             document.querySelectorAll('[data-i18n]').forEach(element => {
                 const key = element.getAttribute('data-i18n');
-                const fallbackText = element.textContent; 
-                const localizedText = i18nResources[key] || fallbackText;
+                const fallbackText = element.textContent || element.title || (element.placeholder || ''); 
+                let localizedText = (i18nResources && i18nResources[key]) || fallbackText;
                 
-                if (element.tagName === 'INPUT' && element.placeholder && i18nResources[key]) element.placeholder = localizedText;
-                else if ((element.tagName === 'BUTTON' || element.tagName === 'SPAN' || element.tagName === 'LABEL' || element.tagName === 'H1' || element.tagName === 'H2' || element.tagName === 'H3' || element.tagName === 'TH' || (element.tagName === 'OPTION' && element.value === "")) && i18nResources[key]) {
-                     element.textContent = localizedText;
-                } else if (element.title && key.endsWith("_tooltip") && i18nResources[key]) {
+                if (element.placeholder && (i18nResources && i18nResources[key])) {
+                     element.placeholder = localizedText;
+                } else if (element.title && (i18nResources && i18nResources[key]) && !element.hasAttribute('data-i18n-tooltip')) { 
+                    // Apply to title only if not specifically a tooltip key
                     element.title = localizedText;
-                } else if (i18nResources[key]) {
-                    element.innerHTML = localizedText; // 주의: innerHTML은 XSS에 취약할 수 있으나, 여기서는 내부 리소스 사용 가정
+                }
+                // For elements that should have their textContent updated
+                else if ((element.tagName === 'BUTTON' || element.tagName === 'SPAN' || element.tagName === 'LABEL' || 
+                           element.tagName === 'H1' || element.tagName === 'H2' || element.tagName === 'H3' || 
+                           element.tagName === 'TH' || (element.tagName === 'OPTION' && element.value === "")) &&
+                           (i18nResources && i18nResources[key])) {
+                     element.textContent = localizedText;
+                } else if (element.tagName !== 'INPUT' && element.tagName !== 'SELECT' && (i18nResources && i18nResources[key])) {
+                     element.textContent = localizedText;
                 }
             });
-            if(요소.appTitle) 요소.appTitle.textContent = i18nResources.app_title || 'Document Translator';
-            if(요소.swapLangBtn) 요소.swapLangBtn.title = i18nResources.swap_lang_button_tooltip || '언어 교체';
+             // Apply to elements targeted by data-i18n-tooltip for titles
+            document.querySelectorAll('[data-i18n-tooltip]').forEach(element => {
+                const key = element.getAttribute('data-i18n-tooltip');
+                if (i18nResources && i18nResources[key]) {
+                    element.title = i18nResources[key];
+                }
+            });
 
-            updateTranslationLanguageOptions(); // 번역 언어 드롭다운 채우기
-            updateOllamaStatusText(); // Ollama 상태 텍스트 업데이트
-            console.log("[ linguistique ] 현지화 적용 완료");
+
+            if(domElements.appTitle) domElements.appTitle.textContent = (i18nResources && i18nResources.app_title) || 'Document Translator';
+            // swapLangButton title is handled by data-i18n-tooltip now
+            
+            updateTranslationLanguageOptions(); 
+            updateOllamaStatusDisplay(); 
+            updateTranslateButtonState(); 
+            // Update initial log box text
+            if (domElements.logBox && domElements.logBox.children.length === 1 && domElements.logBox.children[0].tagName === 'SPAN' && domElements.logBox.children[0].hasAttribute('data-i18n')) {
+                const key = domElements.logBox.children[0].getAttribute('data-i18n');
+                if (i18nResources && i18nResources[key]) {
+                    domElements.logBox.children[0].textContent = i18nResources[key];
+                }
+            }
+
+
+            console.log("[Localization] Localization applied.");
         }
 
-        function updateOllamaStatusText(statusData = null) {
-            if(!요소.ollamaStatusText || !요소.ollamaStatusLabel) return;
-            요소.ollamaStatusLabel.textContent = i18nResources.status_label || '상태';
+        function updateOllamaStatusDisplay(statusData = null) {
+            if(!domElements.ollamaStatusText || !domElements.ollamaStatusLabel) return;
+            domElements.ollamaStatusLabel.textContent = (i18nResources && i18nResources.status_label) || 'Status';
 
             if (statusData) {
-                 if (statusData.running) 요소.ollamaStatusText.textContent = `${i18nResources.ollama_running || '실행 중'} (${i18nResources.ollama_port_label || '포트'}: ${statusData.port})`;
-                 else if (statusData.installed) 요소.ollamaStatusText.textContent = i18nResources.ollama_installed_not_running || '설치됨 (실행되지 않음)';
-                 else 요소.ollamaStatusText.textContent = i18nResources.ollama_not_installed || '설치되지 않음';
+                const portText = (i18nResources && i18nResources.ollama_port_label) || 'Port';
+                 if (statusData.running) domElements.ollamaStatusText.textContent = `${(i18nResources && i18nResources.ollama_running) || 'Running'} (${portText}: ${statusData.port})`;
+                 else if (statusData.installed) domElements.ollamaStatusText.textContent = (i18nResources && i18nResources.ollama_installed_not_running) || 'Installed (not running)';
+                 else domElements.ollamaStatusText.textContent = (i18nResources && i18nResources.ollama_not_installed) || 'Not installed';
             } else {
-                 요소.ollamaStatusText.textContent = i18nResources.status_checking || '확인 중...';
+                 domElements.ollamaStatusText.textContent = (i18nResources && i18nResources.status_checking) || 'Checking...';
             }
         }
         
         function updateTranslationLanguageOptions() {
-            console.log("[ linguistique ] 번역 언어 옵션 업데이트 중...");
-            const langOptionsMap = {
+            console.log("[Localization] Updating translation language options...");
+            const langOptionsMap = { 
                 "ko": "translation_lang_ko", "en": "translation_lang_en", "ja": "translation_lang_ja",
                 "zh-CN": "translation_lang_zh_CN", "zh-TW": "translation_lang_zh_TW",
                 "th": "translation_lang_th", "es": "translation_lang_es"
             };
-            [요소.srcLangSelect, 요소.tgtLangSelect].forEach(select => {
-                if (!select) {
-                    console.warn("언어 선택 드롭다운을 찾을 수 없습니다:", select === 요소.srcLangSelect ? "srcLangSelect" : "tgtLangSelect");
+
+            [domElements.sourceLangSelect, domElements.targetLangSelect].forEach(selectElement => {
+                if (!selectElement) {
+                    console.warn("Language select dropdown not found for update.");
                     return;
                 }
-                const currentValue = select.value;
-                select.innerHTML = ''; // 이전 옵션 제거
-                Object.keys(langOptionsMap).forEach(code => {
+                const currentSelectedValue = selectElement.value;
+                selectElement.innerHTML = ''; 
+                Object.keys(langOptionsMap).forEach(langCode => {
                     const option = document.createElement('option');
-                    option.value = code;
-                    option.textContent = i18nResources[langOptionsMap[code]] || code; // 다국어 이름, 없으면 코드
-                    select.appendChild(option);
+                    option.value = langCode;
+                    option.textContent = (i18nResources && i18nResources[langOptionsMap[langCode]]) || langCode; 
+                    selectElement.appendChild(option);
                 });
-                // 이전 값 복원 또는 기본값 설정
-                if (currentValue && Array.from(select.options).some(opt => opt.value === currentValue)) {
-                    select.value = currentValue;
-                } else if (select.options.length > 0) {
-                    if (select.id === 'src-lang') select.value = (currentUILanguage === 'ko' || currentUILanguage === 'ja') ? currentUILanguage : 'en';
-                    else if (select.id === 'tgt-lang') select.value = (currentUILanguage === 'ko') ? 'en' : 'ko';
+
+                if (currentSelectedValue && Array.from(selectElement.options).some(opt => opt.value === currentSelectedValue)) {
+                    selectElement.value = currentSelectedValue;
+                } else if (selectElement.options.length > 0) {
+                    if (selectElement.id === 'src-lang') {
+                        selectElement.value = (currentUILocale === 'ko' || currentUILocale === 'ja') ? currentUILocale : 'en';
+                    } else if (selectElement.id === 'tgt-lang') {
+                        selectElement.value = (currentUILocale === 'ko') ? 'en' : 'ko';
+                    }
                 }
             });
-            console.log("[ linguistique ] 번역 언어 옵션 업데이트 완료.");
+            console.log("[Localization] Translation language options updated.");
         }
         
-        // --- 이벤트 리스너들 ---
-        if(요소.uiLanguageSelect) 요소.uiLanguageSelect.addEventListener('change', (e) => {
-            console.log('[ 이벤트 ] UI 언어 변경됨:', e.target.value);
-            loadAndSetLanguageResources(e.target.value);
-        });
+        // --- Core Application Logic ---
+        let isModelInstallationInProgress = false; // 모델 설치 진행 중 상태 플래그
+        let defaultOllamaModel = "gemma3:12b"; // 기본값, 추후 API에서 받아오도록 변경 가능
 
-        if(요소.swapLangBtn && 요소.srcLangSelect && 요소.tgtLangSelect) {
-            요소.swapLangBtn.addEventListener('click', () => {
-                console.log('[ 이벤트 ] 언어 교환 버튼 클릭됨');
-                const srcVal = 요소.srcLangSelect.value;
-                const tgtVal = 요소.tgtLangSelect.value;
-                요소.srcLangSelect.value = tgtVal;
-                요소.tgtLangSelect.value = srcVal;
-                updateTranslateButtonState(); 
-            });
-        }
-        
-        function addLog(message, isKey = false, type = 'info') { /* ... 이전과 동일 ... */ }
-        
         async function checkOllamaStatus() {
-            console.log("Ollama 상태 확인 시작...");
+            if (isModelInstallationInProgress) {
+                console.log("Model installation in progress, skipping Ollama status check.");
+                return;
+            }
+            console.log("Checking Ollama status...");
+            domElements.ollamaManagementArea.innerHTML = ''; // 이전 관리 컨트롤 초기화
+            domElements.modelInstallationStatus.style.display = 'none';
+
             try {
-                const response = await fetch('/api/check_ollama');
-                if (!response.ok) { 
+                const response = await fetch('/api/check_ollama'); // 이 API는 default_model_name도 반환하도록 수정 가능
+                if (!response.ok) {
+                    // ... (기존 오류 처리) ...
                     const errorText = await response.text().catch(() => `HTTP ${response.status}`);
-                    throw new Error(`Ollama API 응답 오류: ${errorText}`);
+                    if (domElements.ollamaStatusIndicator) domElements.ollamaStatusIndicator.classList.add('status-offline');
+                    const apiErrorMsgKey = 'ollama_status_error_api_generic';
+                    if (domElements.ollamaStatusText) domElements.ollamaStatusText.textContent = ((i18nResources && i18nResources[apiErrorMsgKey]) || 'API Error: ') + response.status;
+                    throw new Error(`Ollama API response error: ${errorText}`);
                 }
                 const data = await response.json();
-                console.log("Ollama 상태 데이터:", data);
-                
-                updateOllamaStatusText(data);
-                
-                if (요소.ollamaStatusIndicator) {
-                    if (data.running) {
-                        요소.ollamaStatusIndicator.classList.remove('status-offline');
-                        요소.ollamaStatusIndicator.classList.add('status-online');
-                    } else {
-                        요소.ollamaStatusIndicator.classList.remove('status-online');
-                        요소.ollamaStatusIndicator.classList.add('status-offline');
-                        if (data.installed) { /* ... 실행 유도 ... */ } 
-                        else { /* ... 설치 안내 ... */ }
+                console.log("Ollama status data received:", data);
+                // 백엔드에서 기본 모델명을 전달받도록 할 수 있음
+                // defaultOllamaModel = data.default_ollama_model || "gemma3:12b";
+
+
+                updateOllamaStatusDisplay(data); // Ollama 상태 (설치됨, 실행중 등) UI 업데이트
+                if (domElements.ollamaStatusIndicator) {
+                    domElements.ollamaStatusIndicator.classList.toggle('status-online', data.running);
+                    domElements.ollamaStatusIndicator.classList.toggle('status-offline', !data.running);
+                }
+
+                if (!data.installed) {
+                    // 1. Ollama 미설치 시
+                    const notInstalledMsg = (i18nResources && i18nResources.ollama_not_installed_prompt) || 'Ollama is not installed. Please download and install it from the official website.';
+                    const downloadLink = `<a href="https://ollama.com/download" target="_blank">${(i18nResources && i18nResources.ollama_download_link_text) || 'Download Ollama'}</a>`;
+                    domElements.ollamaManagementArea.innerHTML = `<p>${notInstalledMsg} ${downloadLink}</p>`;
+                    addDefaultNoModelsOption('ollama_not_installed_no_models'); // 모델 목록도 업데이트
+                } else if (!data.running) {
+                    // 2. Ollama 비활성화 시 (설치는 되어 있음)
+                    const notRunningMsg = (i18nResources && i18nResources.ollama_not_running_prompt) || 'Ollama is installed but not running.';
+                    const startButton = document.createElement('button');
+                    startButton.textContent = (i18nResources && i18nResources.ollama_start_button) || 'Start Ollama';
+                    startButton.onclick = async () => {
+                        startButton.disabled = true;
+                        startButton.textContent = (i18nResources && i18nResources.ollama_starting_button) || 'Starting...';
+                        addLog('log_ollama_attempt_start', true, 'info');
+                        try {
+                            const startResponse = await fetch('/api/start_ollama', { method: 'POST' });
+                            const startData = await startResponse.json();
+                            if (startData.success) {
+                                addLog('log_ollama_start_success', true, 'success');
+                                setTimeout(checkOllamaStatus, 3000); // 잠시 후 상태 다시 확인
+                            } else {
+                                addLog('log_ollama_start_failed', true, 'error');
+                                startButton.disabled = false;
+                                startButton.textContent = (i18nResources && i18nResources.ollama_start_button) || 'Start Ollama';
+                            }
+                        } catch (e) {
+                            addLog('log_ollama_start_exception', true, 'error', { message: e.message });
+                            startButton.disabled = false;
+                            startButton.textContent = (i18nResources && i18nResources.ollama_start_button) || 'Start Ollama';
+                        }
+                    };
+                    domElements.ollamaManagementArea.innerHTML = `<p>${notRunningMsg} </p>`;
+                    domElements.ollamaManagementArea.appendChild(startButton);
+                    addDefaultNoModelsOption('ollama_not_running_no_models');
+                } else {
+                    // Ollama 설치 및 실행 중 -> 모델 목록 처리
+                    populateModelDropdown(data.models); // 아래 정의된 함수 사용
+
+                    // 3. Ollama 모델 부재 시 기본 모델 자동 설치
+                    if (!data.models || data.models.length === 0 || !data.models.includes(defaultOllamaModel)) {
+                        const modelToInstall = defaultOllamaModel;
+                        domElements.modelInstallMessage.textContent = ((i18nResources && i18nResources.status_default_model_missing_install_prompt) || `Default model '${modelToInstall}' is not found. Attempting to install...`).replace('{modelName}', modelToInstall);
+                        domElements.modelInstallationStatus.style.display = 'block';
+                        domElements.modelInstallProgressBar.style.display = 'block'; // Show progress bar div
+                        domElements.modelInstallProgressFill.style.width = '0%';
+                        domElements.modelInstallProgressFill.textContent = '0%';
+                        isModelInstallationInProgress = true;
+                        pullOllamaModel(modelToInstall);
                     }
                 }
 
-                if(요소.modelSelect) { /* ... 모델 목록 채우기, 이전과 동일 ... */ }
-
-            } catch (error) { /* ... 오류 처리, 이전과 동일 ... */ }
+            } catch (error) {
+                // ... (기존 예외 처리) ...
+                console.error("Exception during Ollama status check:", error);
+                if (domElements.ollamaStatusIndicator) domElements.ollamaStatusIndicator.classList.add('status-offline');
+                if (domElements.ollamaStatusText) domElements.ollamaStatusText.textContent = (i18nResources && i18nResources.ollama_status_exception) || 'Error checking status';
+                if (domElements.modelSelect) addDefaultNoModelsOption('model_load_error');
+            }
             updateTranslateButtonState();
         }
 
-        async function startOllama() { /* ... 이전과 동일 ... */ }
-        if(요소.fileInput) 요소.fileInput.addEventListener('change', async (e) => { /* ... 이전과 동일 ... */ });
-        if(요소.fileLabel) { /* ... 드래그앤드롭 이전과 동일 ... */ }
-        function updateTranslateButtonState() { /* ... 이전과 동일 ... */ }
-        [요소.srcLangSelect, 요소.tgtLangSelect, 요소.modelSelect].forEach(el => { /* ... 이전과 동일 ... */ });
-        if(요소.ocrTempSlider && 요소.ocrTempValue) 요소.ocrTempSlider.addEventListener('input', (e) => 요소.ocrTempValue.textContent = e.target.value);
-        if(요소.translateBtn) 요소.translateBtn.addEventListener('click', async () => { /* ... 이전과 동일 ... */ });
-        function startProgressMonitoring(taskId) { /* ... 이전과 동일 ... */ }
-        
-        // 탭 전환 로직
-        if(요소.tabs && 요소.tabContents) {
-            요소.tabs.forEach(tab => {
-                tab.addEventListener('click', () => {
-                    const tabName = tab.dataset.tab;
-                    console.log('[ 이벤트 ] 탭 클릭됨:', tabName);
-                    
-                    요소.tabs.forEach(t => t.classList.remove('active'));
-                    tab.classList.add('active');
-                    
-                    요소.tabContents.forEach(content => {
-                        // console.log(`탭 컨텐츠 ${content.id} 활성 클래스 제거 시도`);
-                        content.classList.remove('active');
-                    });
+        async function pullOllamaModel(modelName) {
+            addLog('log_model_pull_starting', true, 'info', { modelName: modelName });
+            isModelInstallationInProgress = true; // Set flag
+            domElements.modelInstallMessage.textContent = ((i18nResources && i18nResources.status_model_pulling) || "Downloading model {modelName}...").replace('{modelName}', modelName);
+            domElements.modelInstallProgressBar.style.display = 'block';
+            domElements.modelInstallProgressFill.style.width = '0%';
+            domElements.modelInstallProgressFill.textContent = '0%';
 
-                    const activeContent = document.getElementById(`${tabName}-tab`);
-                    if (activeContent) {
-                        activeContent.classList.add('active');
-                        console.log(`탭 컨텐츠 ${activeContent.id} 활성화됨`);
-                    } else {
-                        console.error(`ID가 '${tabName}-tab'인 탭 컨텐츠를 찾을 수 없습니다.`);
-                    }
-                    
-                    if (tabName === 'history') {
-                        console.log('번역 이력 탭 활성화, 이력 로드 중...');
-                        loadHistory();
-                    }
+            try {
+                // 1. Start the pull process on the backend
+                const pullResponse = await fetch('/api/pull_model', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ model_name: modelName })
                 });
-            });
-        } else {
-            console.error("탭 또는 탭 컨텐츠 요소를 찾을 수 없어 탭 전환 로직을 설정할 수 없습니다.");
+                const pullData = await pullResponse.json();
+
+                if (!pullResponse.ok || !pullData.success) {
+                    throw new Error(pullData.error || ((i18nResources && i18nResources.error_model_pull_start_failed) || 'Failed to start model download.'));
+                }
+
+                // 2. Listen for progress updates using SSE
+                if (modelPullEventSource) {
+                    modelPullEventSource.close();
+                }
+                modelPullEventSource = new EventSource(`/api/model_pull_progress/${encodeURIComponent(modelName)}`);
+
+                modelPullEventSource.onmessage = function(event) {
+                    const progressData = JSON.parse(event.data);
+                    console.log("Model pull progress:", progressData);
+                    domElements.modelInstallMessage.textContent = progressData.status;
+
+                    if (progressData.total > 0 && progressData.completed >= 0) {
+                        const percentage = Math.round((progressData.completed / progressData.total) * 100);
+                        domElements.modelInstallProgressFill.style.width = `${percentage}%`;
+                        domElements.modelInstallProgressFill.textContent = `${percentage}%`;
+                    } else if (progressData.status.toLowerCase().includes("downloading") || progressData.status.toLowerCase().includes("pulling")) {
+                        // Indeterminate progress if total is not available yet
+                        domElements.modelInstallProgressFill.style.width = '100%'; // Or a looping animation
+                        domElements.modelInstallProgressFill.textContent = ''; // No percentage
+                    }
+
+
+                    if (progressData.error) {
+                        addLog('log_model_pull_error', true, 'error', { modelName: modelName, details: progressData.status });
+                        modelPullEventSource.close();
+                        isModelInstallationInProgress = false;
+                        domElements.modelInstallationStatus.style.display = 'none';
+                        checkOllamaStatus(); // Refresh status
+                    } else if (progressData.done) {
+                        addLog('log_model_pull_success', true, 'success', { modelName: modelName });
+                        modelPullEventSource.close();
+                        isModelInstallationInProgress = false;
+                        domElements.modelInstallationStatus.style.display = 'none';
+                        checkOllamaStatus(); // Refresh status and model list
+                    }
+                };
+
+                modelPullEventSource.onerror = function(err) {
+                    console.error("Model pull EventSource failed:", err);
+                    addLog('log_model_pull_error_connection', true, 'error', { modelName: modelName });
+                    modelPullEventSource.close();
+                    isModelInstallationInProgress = false;
+                    domElements.modelInstallationStatus.style.display = 'none';
+                    checkOllamaStatus(); // Refresh status
+                };
+
+            } catch (error) {
+                console.error("Error initiating model pull:", error);
+                addLog('log_model_pull_init_failed', true, 'error', { modelName: modelName, message: error.message });
+                isModelInstallationInProgress = false;
+                domElements.modelInstallationStatus.style.display = 'none';
+                checkOllamaStatus(); // Refresh status
+            }
         }
 
+        function populateModelDropdown(modelsArray) {
+            if (domElements.modelSelect) {
+                const currentModelVal = domElements.modelSelect.value;
+                domElements.modelSelect.innerHTML = '';
+
+                if (modelsArray && Array.isArray(modelsArray) && modelsArray.length > 0) {
+                    console.log(`[ModelPopulation] Populating with ${modelsArray.length} models:`, modelsArray);
+                    let validModelsFound = 0;
+                    modelsArray.forEach(modelName => {
+                        if (typeof modelName === 'string' && modelName.trim() !== '') {
+                            const option = document.createElement('option');
+                            option.value = modelName;
+                            option.textContent = modelName;
+                            domElements.modelSelect.appendChild(option);
+                            validModelsFound++;
+                        }
+                    });
+
+                    if (validModelsFound > 0) {
+                        const firstValidModel = domElements.modelSelect.options[0].value;
+                        if (currentModelVal && modelsArray.includes(currentModelVal)) {
+                            domElements.modelSelect.value = currentModelVal;
+                        } else {
+                            domElements.modelSelect.value = firstValidModel;
+                        }
+                        console.log(`[ModelPopulation] Model selection set to: ${domElements.modelSelect.value}`);
+                    } else {
+                         addDefaultNoModelsOption('no_models_found');
+                    }
+                } else {
+                    addDefaultNoModelsOption('no_models_found');
+                }
+            } else {
+                console.error("[ModelPopulation] CRITICAL: domElements.modelSelect not found!");
+            }
+        }
+
+
+        let modelPullEventSource = null;
+
+        
+        function updateTranslateButtonState() {
+            const fileReady = currentServerFilePath && currentFileObject;
+            const sourceLangSelected = domElements.sourceLangSelect && domElements.sourceLangSelect.value;
+            const targetLangSelected = domElements.targetLangSelect && domElements.targetLangSelect.value;
+            const modelSelected = domElements.modelSelect && domElements.modelSelect.value;
+
+            if (domElements.translateButton) {
+                domElements.translateButton.disabled = !(fileReady && sourceLangSelected && targetLangSelected && modelSelected);
+            }
+        }
+
+        async function handleFileSelect(file) {
+            if (!file) return;
+
+            if (!file.name.toLowerCase().endsWith('.pptx')) {
+                addLog('error_invalid_file_type_pptx', true, 'error');
+                resetFileInput();
+                return;
+            }
+
+            currentFileObject = file;
+            if (domElements.fileNameDisplay) domElements.fileNameDisplay.textContent = file.name;
+            if (domElements.fileUploadLabel) domElements.fileUploadLabel.textContent = file.name; 
+
+            addLog('file_analyzing', true, 'info');
+            if (domElements.fileInfoBox) domElements.fileInfoBox.style.display = 'none';
+            if (domElements.translateButton) domElements.translateButton.disabled = true;
+
+            const formData = new FormData();
+            formData.append('file', currentFileObject);
+
+            try {
+                const response = await fetch('/api/file_info', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await response.json();
+
+                if (response.ok && data.filepath) {
+                    currentServerFilePath = data.filepath;
+                    if (domElements.fileNameDisplay) domElements.fileNameDisplay.textContent = data.filename || currentFileObject.name;
+                    if (domElements.slideCountDisplay) domElements.slideCountDisplay.textContent = data.info.slide_count ?? '-';
+                    if (domElements.textCountDisplay) domElements.textCountDisplay.textContent = `${data.info.text_elements_count ?? '-'} (${data.info.total_text_char_count ?? '-'})`;
+                    if (domElements.imageCountDisplay) domElements.imageCountDisplay.textContent = data.info.image_elements_count ?? '-';
+                    if (domElements.chartCountDisplay) domElements.chartCountDisplay.textContent = data.info.chart_elements_count ?? '-';
+                    if (domElements.fileInfoBox) domElements.fileInfoBox.style.display = 'block';
+                    addLog('file_analysis_complete', true, 'success');
+                } else {
+                    throw new Error(data.error || ((i18nResources && i18nResources.error_file_analysis_failed) || 'File analysis failed'));
+                }
+            } catch (error) {
+                console.error("File processing error:", error);
+                addLog('error_file_processing', true, 'error', { message: error.message });
+                resetFileInput();
+            }
+            updateTranslateButtonState();
+        }
+
+        function resetFileInput() {
+            currentFileObject = null;
+            currentServerFilePath = null;
+            if (domElements.fileInput) domElements.fileInput.value = ''; 
+            if (domElements.fileUploadLabel) domElements.fileUploadLabel.textContent = (i18nResources && i18nResources.file_upload_label) || 'Select or drag and drop a PowerPoint file here';
+            if (domElements.fileInfoBox) domElements.fileInfoBox.style.display = 'none';
+            if (domElements.fileNameDisplay) domElements.fileNameDisplay.textContent = '-';
+            if (domElements.slideCountDisplay) domElements.slideCountDisplay.textContent = '-';
+            if (domElements.textCountDisplay) domElements.textCountDisplay.textContent = '-';
+            if (domElements.imageCountDisplay) domElements.imageCountDisplay.textContent = '-';
+            if (domElements.chartCountDisplay) domElements.chartCountDisplay.textContent = '-';
+            updateTranslateButtonState();
+        }
+        
+        function startProgressMonitoring(taskId) {
+            console.log(`[Progress] Monitoring started for task ID: ${taskId}`);
+            if (progressEventSource) {
+                progressEventSource.close();
+            }
+            progressEventSource = new EventSource(`/api/progress/${taskId}`);
+
+            progressEventSource.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+                if (domElements.progressFill) {
+                    domElements.progressFill.style.width = `${data.progress}%`;
+                    domElements.progressFill.textContent = `${data.progress}%`;
+                }
+                if (domElements.progressStatusDisplay) domElements.progressStatusDisplay.textContent = data.status; // Should be localized from backend
+                if (domElements.currentTaskDisplay) domElements.currentTaskDisplay.textContent = data.current_task || "";
+
+                if (data.completed) {
+                    progressEventSource.close();
+                    if (domElements.stopTranslationButton) domElements.stopTranslationButton.style.display = 'none';
+                    if (data.download_url && !data.error) {
+                        if (domElements.downloadButton) {
+                            domElements.downloadButton.onclick = () => window.location.href = data.download_url;
+                            domElements.downloadButton.style.display = 'block';
+                        }
+                        addLog("translation_completed_download", true, "success");
+                    } else if (data.error) {
+                        addLog('log_translation_error_generic', true, "error", { error: data.error });
+                    } else {
+                         addLog("translation_completed_no_download", true, "info");
+                    }
+                }
+            };
+            progressEventSource.onerror = function(err) {
+                console.error("EventSource failed:", err);
+                addLog('error_progress_connection', true, "error");
+                progressEventSource.close();
+                if (domElements.stopTranslationButton) domElements.stopTranslationButton.style.display = 'none';
+            };
+        }
+        
         async function loadHistory() {
-            if(!요소.historyBody) {
-                console.error("이력 테이블 body(historyBody)를 찾을 수 없습니다.");
-                addLog("이력 표시 영역을 찾을 수 없습니다.", false, 'error');
+            if(!domElements.historyTableBody) {
+                console.error("History table body not found.");
+                addLog('error_history_area_not_found', true, 'error');
                 return;
             }
             try {
-                console.log("이력 데이터 요청 중...");
+                console.log("Requesting history data...");
                 const response = await fetch('/api/history');
                 if (!response.ok) {
                     const errorText = await response.text().catch(() => `HTTP ${response.status}`);
-                    addLog(`${i18nResources.error_history_load_status || '이력 로드 실패, 상태'}: ${errorText}`, false, 'error');
-                    console.error("이력 API 요청 실패:", response.status, errorText);
+                    addLog('error_history_load_status', true, 'error', { status: errorText });
+                    console.error("History API request failed:", response.status, errorText);
                     return; 
                 }
-                const history = await response.json();
-                console.log("이력 데이터 수신:", history);
+                const historyData = await response.json();
+                console.log("History data received:", historyData);
                 
-                요소.historyBody.innerHTML = ''; 
-                if (Array.isArray(history)) { 
-                    history.slice(0, 20).forEach(item => {
+                domElements.historyTableBody.innerHTML = ''; 
+                if (Array.isArray(historyData)) { 
+                    historyData.slice(0, 20).forEach(item => { 
                         if (typeof item === 'object' && item !== null) { 
                             const tr = document.createElement('tr');
                             tr.innerHTML = `
@@ -729,41 +1038,223 @@
                                 <td>${item.tgt || '-'}</td> <td>${item.model || '-'}</td>
                                 <td>${item.status || '-'}</td> <td>${item.time || '-'}</td>
                             `;
-                            요소.historyBody.appendChild(tr);
-                        } else { /* ... 오류 처리 ... */ }
+                            domElements.historyTableBody.appendChild(tr);
+                        } else { 
+                            console.warn("Invalid history item format:", item);
+                        }
                     });
-                } else { /* ... 오류 처리 ... */ }
-            } catch (error) { /* ... 오류 처리 ... */ }
+                } else { 
+                    console.warn("History data is not an array:", historyData);
+                    addLog('warning_history_invalid_format', true, 'warning');
+                }
+            } catch (error) { 
+                console.error("Exception loading history:", error);
+                addLog('error_history_load_exception', true, 'error', { message: error.message });
+            }
         }
 
-        // 새 버튼 이벤트 리스너
-        if(요소.openLogFolderBtn) 요소.openLogFolderBtn.addEventListener('click', async () => { /* ... 이전과 동일 (콘솔 로그 추가된 버전) ... */ });
-        if(요소.deleteHistoryBtn) 요소.deleteHistoryBtn.addEventListener('click', async () => { /* ... 이전과 동일 (콘솔 로그 추가된 버전) ... */ });
-        if(요소.stopTranslationBtn) 요소.stopTranslationBtn.addEventListener('click', async () => { /* ... 이전과 동일 ... */ });
-        
-        // 초기화
-        window.addEventListener('load', async () => {
-            console.log("페이지 로드 완료, 초기화 시작.");
-            const uiLangOptions = { "ko": "한국어", "en": "English", "ja": "日本語", "zh-CN": "简体中文", "zh-TW": "繁體中文", "th": "ไทย" };
-            if(요소.uiLanguageSelect) {
-                Object.entries(uiLangOptions).forEach(([code, name]) => {
-                    const option = document.createElement('option');
-                    option.value = code;
-                    option.textContent = name;
-                    요소.uiLanguageSelect.appendChild(option);
+        // --- Event Listeners Setup ---
+        function setupEventListeners() {
+            if(domElements.uiLanguageSelect) {
+                domElements.uiLanguageSelect.addEventListener('change', (e) => {
+                    console.log('[Event] UI language changed to:', e.target.value);
+                    loadAndSetLanguageResources(e.target.value);
                 });
-                const savedLanguage = localStorage.getItem('uiLanguagePDT') || 'ko';
-                요소.uiLanguageSelect.value = savedLanguage;
-                await loadAndSetLanguageResources(savedLanguage); // await 추가
-            } else { 
-                console.warn("UI 언어 선택 드롭다운을 찾을 수 없습니다.");
-                await loadAndSetLanguageResources('ko'); // 기본 한국어로 시도
+            }
+
+            if(domElements.swapLangButton && domElements.sourceLangSelect && domElements.targetLangSelect) {
+                domElements.swapLangButton.addEventListener('click', () => {
+                    console.log('[Event] Swap languages button clicked.');
+                    const sourceVal = domElements.sourceLangSelect.value;
+                    const targetVal = domElements.targetLangSelect.value;
+                    domElements.sourceLangSelect.value = targetVal;
+                    domElements.targetLangSelect.value = sourceVal;
+                    updateTranslateButtonState(); 
+                });
             }
             
-            // DOM 요소들이 확실히 로드된 후 실행
-            checkOllamaStatus();
-            loadHistory(); // 초기 히스토리 로드
-            console.log("초기화 완료.");
+            if (domElements.fileInput) {
+                domElements.fileInput.addEventListener('change', (e) => handleFileSelect(e.target.files[0]));
+            }
+
+            if (domElements.fileUploadLabel && domElements.fileInput) {
+                ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                    domElements.fileUploadLabel.addEventListener(eventName, preventDefaults, false);
+                    document.body.addEventListener(eventName, preventDefaults, false); 
+                });
+
+                function preventDefaults(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                }
+
+                ['dragenter', 'dragover'].forEach(eventName => {
+                    domElements.fileUploadLabel.addEventListener(eventName, () => {
+                        domElements.fileUploadLabel.classList.add('dragover-active');
+                        domElements.fileUploadLabel.textContent = (i18nResources && i18nResources.file_drop_prompt) || 'Drop the file here';
+                    }, false);
+                });
+
+                domElements.fileUploadLabel.addEventListener('dragleave', () => {
+                    domElements.fileUploadLabel.classList.remove('dragover-active');
+                    const originalLabelKey = 'file_upload_label';
+                    domElements.fileUploadLabel.textContent = currentFileObject ? currentFileObject.name : ((i18nResources && i18nResources[originalLabelKey]) || 'Select or drag and drop a PowerPoint file here');
+                }, false);
+
+                domElements.fileUploadLabel.addEventListener('drop', async (e) => {
+                    domElements.fileUploadLabel.classList.remove('dragover-active');
+                    const droppedFiles = e.dataTransfer.files;
+                    if (droppedFiles.length > 0) {
+                        handleFileSelect(droppedFiles[0]); 
+                    } else {
+                        const originalLabelKey = 'file_upload_label';
+                        domElements.fileUploadLabel.textContent = (i18nResources && i18nResources[originalLabelKey]) || 'Select or drag and drop a PowerPoint file here';
+                    }
+                }, false);
+            }
+
+            [domElements.sourceLangSelect, domElements.targetLangSelect, domElements.modelSelect].forEach(selectElement => {
+                if (selectElement) selectElement.addEventListener('change', updateTranslateButtonState);
+            });
+            
+            if(domElements.ocrTemperatureSlider && domElements.ocrTemperatureValueDisplay) {
+                domElements.ocrTemperatureSlider.addEventListener('input', (e) => {
+                    domElements.ocrTemperatureValueDisplay.textContent = e.target.value;
+                });
+            }
+            
+            if(domElements.translateButton) {
+                domElements.translateButton.addEventListener('click', async () => {
+                    if (!currentServerFilePath || !currentFileObject) {
+                        addLog('error_no_file_for_translation', true, 'error');
+                        return;
+                    }
+                    console.log('[Event] Translate button clicked.');
+                    domElements.translateButton.disabled = true;
+                    if(domElements.progressPanel) domElements.progressPanel.style.display = 'block';
+                    if(domElements.progressFill) {
+                         domElements.progressFill.style.width = '0%';
+                         domElements.progressFill.textContent = '0%';
+                    }
+                    if(domElements.progressStatusDisplay) domElements.progressStatusDisplay.textContent = (i18nResources && i18nResources.status_translation_starting) || "Translation starting...";
+                    if(domElements.downloadButton) domElements.downloadButton.style.display = 'none';
+                    if(domElements.stopTranslationButton) domElements.stopTranslationButton.style.display = 'block';
+
+                    const payload = {
+                        filepath: currentServerFilePath,
+                        src_lang: domElements.sourceLangSelect.value,
+                        tgt_lang: domElements.targetLangSelect.value,
+                        model: domElements.modelSelect.value,
+                        image_translation: document.getElementById('image-translation').checked,
+                        ocr_temperature: parseFloat(domElements.ocrTemperatureSlider.value),
+                        ocr_use_gpu: document.getElementById('ocr-gpu').checked,
+                        ui_language: currentUILocale
+                    };
+
+                    try {
+                        const response = await fetch('/api/translate', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        });
+                        const data = await response.json();
+                        if (response.ok && data.task_id) {
+                            currentTranslationTaskId = data.task_id;
+                            addLog('log_translation_task_started_id', true, 'info', { taskId: currentTranslationTaskId });
+                            startProgressMonitoring(currentTranslationTaskId);
+                        } else {
+                             throw new Error(data.error || ((i18nResources && i18nResources.error_translation_start_failed) || "Failed to start translation task"));
+                        }
+                    } catch (error) {
+                        console.error("Error starting translation:", error);
+                        addLog('error_starting_translation_exception', true, 'error', { message: error.message });
+                        if(domElements.translateButton) domElements.translateButton.disabled = false; 
+                        if(domElements.progressPanel) domElements.progressPanel.style.display = 'none';
+                        if(domElements.stopTranslationButton) domElements.stopTranslationButton.style.display = 'none';
+                    }
+                });
+            }
+            
+            if(domElements.tabs && domElements.tabContents) {
+                domElements.tabs.forEach(tab => {
+                    tab.addEventListener('click', () => {
+                        const tabName = tab.dataset.tab;
+                        console.log('[Event] Tab clicked:', tabName);
+                        
+                        domElements.tabs.forEach(t => t.classList.remove('active'));
+                        tab.classList.add('active');
+                        
+                        domElements.tabContents.forEach(content => content.classList.remove('active'));
+
+                        const activeContent = document.getElementById(`${tabName}-tab`);
+                        if (activeContent) {
+                            activeContent.classList.add('active');
+                            console.log(`Tab content ${activeContent.id} activated.`);
+                        } else {
+                            console.error(`Tab content with ID '${tabName}-tab' not found.`);
+                        }
+                        
+                        if (tabName === 'history') {
+                            console.log('History tab activated, loading history...');
+                            loadHistory();
+                        }
+                    });
+                });
+            } else {
+                console.error("Tabs or tab contents not found; tab switching logic cannot be set up.");
+            }
+
+            if(domElements.stopTranslationButton) {
+                domElements.stopTranslationButton.addEventListener('click', async () => {
+                    if (currentTranslationTaskId) {
+                        console.log(`[Event] Stop translation button clicked for task: ${currentTranslationTaskId}`);
+                        addLog('translation_stopping_task', true, 'info', { taskId: currentTranslationTaskId });
+                        try {
+                            const response = await fetch(`/api/stop_translation/${currentTranslationTaskId}`, { method: 'POST' });
+                            const data = await response.json();
+                            if (response.ok) {
+                                addLog('log_translation_stop_signal_sent', true, 'success');
+                            } else {
+                                throw new Error(data.error || ((i18nResources && i18nResources.error_sending_stop_signal) || "Failed to send stop signal"));
+                            }
+                        } catch (error) {
+                            console.error("Error stopping translation:", error);
+                            addLog('error_stopping_translation_exception', true, 'error', { message: error.message });
+                        }
+                    } else {
+                        addLog('warning_no_active_task_to_stop', true, 'warning');
+                    }
+                });
+            }
+        }
+        
+        // --- Initialization ---
+        window.addEventListener('load', async () => {
+            console.log("Page loaded, starting initialization.");
+            const uiLanguageOptions = { "ko": "한국어", "en": "English", "ja": "日本語", "zh-CN": "简体中文", "zh-TW": "繁體中文", "th": "ไทย" };
+            if(domElements.uiLanguageSelect) {
+                Object.entries(uiLanguageOptions).forEach(([code, name]) => {
+                    const option = document.createElement('option');
+                    option.value = code;
+                    option.textContent = name; // This will be overwritten by applyLocalization if a key exists
+                    domElements.uiLanguageSelect.appendChild(option);
+                });
+                const savedLanguage = localStorage.getItem('uiLanguagePDT') || 'ko'; 
+                domElements.uiLanguageSelect.value = savedLanguage;
+                await loadAndSetLanguageResources(savedLanguage); 
+            } else { 
+                console.warn("UI language select dropdown not found. Defaulting to 'ko'.");
+                await loadAndSetLanguageResources('ko'); 
+            }
+            
+            setupEventListeners(); 
+            
+            checkOllamaStatus(); 
+            loadHistory();       
+            resetFileInput();    
+            updateTranslateButtonState();
+
+            console.log("Initialization complete.");
         });
     </script>
 </body>
