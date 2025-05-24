@@ -800,10 +800,9 @@ class PptxHandler(AbsPptxProcessor):
                                     if progress_callback_item_completed:
                                         progress_callback_item_completed(ocr_feedback_location, "이미지 내 텍스트 렌더링", 0, f"'{item_name_ocr_log}'")
 
-
                                     if len(ocr_texts_for_translation) == len(translated_ocr_texts):
                                         img_to_render_on = img_pil_original.copy() # Work on a copy
-                                        any_text_rendered_on_image = False
+                                        any_text_rendered_on_image = False # 사용자 파일의 변수명 유지
                                         for i, translated_text in enumerate(translated_ocr_texts):
                                             if stop_event and stop_event.is_set(): break
                                             render_ctx = ocr_contexts_for_render[i]
@@ -817,7 +816,7 @@ class PptxHandler(AbsPptxProcessor):
                                                         img_to_render_on, render_ctx['box'], translated_text,
                                                         font_code_for_render, render_ctx['original_text'], render_ctx['angle']
                                                     )
-                                                    any_text_rendered_on_image = True
+                                                    any_text_rendered_on_image = True # 사용자 파일의 변수명 유지
                                                     if log_func_s1: log_func_s1(f"            -> 렌더링 완료.")
                                                 except Exception as e_render:
                                                     logger.error(f"{main_log_prefix} Error rendering OCR text on '{item_name_ocr_log}': {e_render}", exc_info=True)
@@ -825,34 +824,43 @@ class PptxHandler(AbsPptxProcessor):
                                             elif log_func_s1:
                                                 log_func_s1(f"            -> 번역 오류 또는 빈 결과로 렌더링 안 함: {translated_text[:100]}")
                                         
-                                        if stop_event and stop_event.is_set(): break # Break outer loop if stopped during rendering
+                                        if stop_event and stop_event.is_set(): break 
 
-                                        if any_text_rendered_on_image:
-                                            output_img_byte_stream = io.BytesIO()
+                                        if any_text_rendered_on_image: # 사용자 파일의 변수명 유지
+                                            output_img_byte_stream = io.BytesIO() # 사용자 파일의 변수명 유지
                                             save_format = img_pil_original.format if img_pil_original.format and img_pil_original.format.upper() in ['JPEG', 'PNG', 'GIF', 'BMP', 'TIFF'] else 'PNG'
                                             img_to_render_on.save(output_img_byte_stream, format=save_format)
-                                            output_img_byte_stream.seek(0)
-
-                                            # Replace the image in the slide
-                                            # This requires removing the old shape and adding a new picture.
-                                            # The new picture will be at the end of the shapes collection for that slide.
-                                            # Grouping and z-order might be affected.
-                                            slide_part = shape_ocr.part.slide_part
-                                            image_part, rId = slide_part.get_or_add_image_part(output_img_byte_stream)
                                             
-                                            # Create a new picture shape using the new image part
-                                            # We need to carefully manage the element tree if we want to replace precisely.
-                                            # For simplicity, a common way is to delete and re-add, though it has side effects.
+                                            output_img_byte_stream.seek(0) # 첫 번째 읽기 전 스트림 위치 초기화
+
+                                            # 수정된 부분 시작
+                                            current_slide_part = shape_ocr.part # shape_ocr.part가 이미 SlidePart 객체입니다.
+                                            
+                                            # 이 호출은 이미지 데이터를 패키지에 등록하고 rId를 반환합니다. 스트림을 소비합니다.
+                                            image_part, rId = current_slide_part.get_or_add_image_part(output_img_byte_stream)
+                                            
+                                            # shapes.add_picture도 스트림을 읽으므로, 반드시 다시 seek(0) 해야 합니다.
+                                            output_img_byte_stream.seek(0) 
+                                            # 수정된 부분 끝
+                                            
                                             pic_xml_element = shape_ocr.element
                                             parent_xml_element = pic_xml_element.getparent()
                                             if parent_xml_element is not None:
+                                                # 교체 전 기존 도형의 위치/크기/이름 정보 저장
+                                                original_left = shape_ocr.left
+                                                original_top = shape_ocr.top
+                                                original_width = shape_ocr.width
+                                                original_height = shape_ocr.height
+                                                original_name = shape_ocr.name
+                                                
                                                 parent_xml_element.remove(pic_xml_element) # Remove old picture
-                                                # Add new picture with same dimensions and position
-                                                new_pic = slide_ocr.shapes.add_picture(
-                                                    output_img_byte_stream, shape_ocr.left, shape_ocr.top,
-                                                    width=shape_ocr.width, height=shape_ocr.height
+                                                
+                                                # 새 그림 추가 시 저장된 위치/크기 정보 사용
+                                                new_pic = slide_ocr.shapes.add_picture( # slide_ocr은 현재 루프의 슬라이드 객체입니다.
+                                                    output_img_byte_stream, original_left, original_top,
+                                                    width=original_width, height=original_height
                                                 )
-                                                if shape_ocr.name: new_pic.name = shape_ocr.name # Preserve name if it existed
+                                                if original_name: new_pic.name = original_name # Preserve name if it existed
                                                 if log_func_s1: log_func_s1(f"        이미지 '{item_name_ocr_log}' 성공적으로 업데이트 및 교체됨.")
                                             else:
                                                 logger.warning(f"{main_log_prefix} Could not find parent XML element for image '{item_name_ocr_log}'. Replacement failed.")

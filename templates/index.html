@@ -106,7 +106,7 @@
         .language-selection-area {
             display: flex;
             justify-content: space-between;
-            align-items: flex-start; /* Align labels and dropdowns to the top */
+            align-items: flex-start; 
             gap: 10px;
         }
 
@@ -124,7 +124,7 @@
         .language-swap-column {
             display: flex;
             align-items: center;
-            padding-top: calc((0.9em * 1.6) + 3px); /* Align button with select inputs */
+            padding-top: calc((0.9em * 1.6) + 3px); 
         }
 
         #swap-lang-btn {
@@ -144,7 +144,7 @@
         }
         
         input[type="file"] {
-            display: none; /* Hidden as label is used for styling */
+            display: none; 
         }
 
         select, button, input[type="range"], input[type="checkbox"]+label {
@@ -177,7 +177,22 @@
             cursor: not-allowed;
         }
 
-        .action-button { /* Style for general action buttons, if any remain */
+        button.stop-button {
+            background-color: #dc3545;
+        }
+        button.stop-button:hover {
+            background-color: #c82333;
+        }
+
+        button.download-button {
+            background-color: #28a745;
+        }
+        button.download-button:hover {
+            background-color: #218838;
+        }
+
+
+        .action-button { 
             background-color: #6c757d;
             font-size: 0.85em;
             padding: 6px 10px;
@@ -202,7 +217,7 @@
             cursor: pointer;
         }
         
-        .file-upload-label.dragover-active { /* Style for drag-over state */
+        .file-upload-label.dragover-active { 
             background-color: #d5dbdb;
             border-color: #95a5a6;
         }
@@ -249,7 +264,7 @@
         }
         .log-entry-error { color: #e74c3c; }
         .log-entry-success { color: #27ae60; }
-        .log-entry-info { color: #f8f9fa; } /* Default log color */
+        .log-entry-info { color: #f8f9fa; } 
         .log-entry-warning { color: #f39c12; }
 
 
@@ -294,7 +309,7 @@
         
         .tabs {
             display: flex;
-            justify-content: space-between; /* Adjusted for button removal */
+            justify-content: space-between; 
             align-items: center;
             border-bottom: 2px solid #dee2e6;
             margin-bottom: 10px;
@@ -302,7 +317,7 @@
         .tab-group {
             display: flex; 
         }
-        .tab-buttons { /* This div is now empty, can be removed or hidden if no other buttons are planned */
+        .tab-buttons { 
             display: flex;
         }
         
@@ -326,14 +341,70 @@
         .tab-content.active {
             display: block;
         }
-        
-        #stop-translation-btn {
-            background-color: #dc3545;
-            font-size: 0.9em;
-            padding: 8px 12px;
+
+        /* Custom Modal Styles */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.6);
+            display: flex; /* Changed from none to flex for centering */
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            /* display: none; /* Initially hidden */
         }
-        #stop-translation-btn:hover {
-            background-color: #c82333;
+
+        .modal-content {
+            background-color: #fff;
+            padding: 25px;
+            border-radius: 8px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            width: 90%;
+            max-width: 450px;
+            text-align: center;
+        }
+
+        .modal-content h3 {
+            margin-top: 0;
+            margin-bottom: 15px;
+            color: #333;
+        }
+
+        .modal-content p {
+            margin-bottom: 20px;
+            color: #555;
+            font-size: 0.95em;
+            line-height: 1.6;
+        }
+
+        .modal-actions button {
+            padding: 10px 20px;
+            margin: 0 10px;
+            border-radius: 5px;
+            font-size: 0.9em;
+            cursor: pointer;
+            min-width: 100px;
+        }
+
+        #modal-confirm-btn { /* Generic confirm, can be overridden by more specific i18n keys */
+            background-color: #007bff;
+            color: white;
+            border: 1px solid #007bff;
+        }
+        #modal-confirm-btn:hover {
+            background-color: #0056b3;
+        }
+
+        #modal-cancel-btn { /* Generic cancel */
+            background-color: #6c757d;
+            color: white;
+            border: 1px solid #6c757d;
+        }
+        #modal-cancel-btn:hover {
+            background-color: #5a6268;
         }
         
         @media (max-width: 768px) {
@@ -348,6 +419,8 @@
             .tabs { flex-direction: column; align-items: stretch; }
             .tab-group { margin-bottom: 5px; }
             .tab-buttons { justify-content: flex-end; }
+            .modal-content { padding: 20px; max-width: 90%;}
+            .modal-actions button { margin: 5px; min-width: 80px; }
         }
     </style>
 </head>
@@ -368,6 +441,10 @@
                         <span id="model-install-message"></span>
                         <div id="model-install-progress-bar" style="background-color: #e0e0e0; border-radius: 3px; margin-top: 2px; display: none;">
                             <div id="model-install-progress-fill" style="width: 0%; background-color: #4caf50; height: 10px; border-radius: 3px; text-align: center; line-height: 10px; font-size: 8px; color: white;">0%</div>
+                        </div>
+                    </div>
+                 </div>
+            </div>
         </header>
         
         <div class="main-content">
@@ -438,13 +515,11 @@
             <div class="panel full-width" id="progress-panel" style="display: none;">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                     <h2 data-i18n="translation_progress_title">Translation Progress</h2>
-                    <button id="stop-translation-btn" style="display: none;" data-i18n="stop_translation_button">Stop Translation</button>
-                </div>
+                    </div>
                 <div class="progress-bar"><div class="progress-fill" id="progress-fill">0%</div></div>
                 <div id="progress-status" data-i18n="status_preparing">Preparing...</div>
                 <div id="current-task" style="color: #666; font-size: 0.9em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"></div>
-                <button id="download-btn" style="display: none; margin-top: 15px;" data-i18n="download_button">Download Translated File</button>
-            </div>
+                </div>
             
             <div class="panel full-width">
                 <div class="tabs">
@@ -472,6 +547,17 @@
             </div>
         </div>
     </div>
+
+    <div id="custom-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content">
+            <h3 id="modal-title" data-i18n="modal_title_default">Confirmation</h3>
+            <p id="modal-message" data-i18n="modal_message_default">Are you sure?</p>
+            <div class="modal-actions">
+                <button id="modal-confirm-btn" data-i18n="modal_button_confirm">Confirm</button>
+                <button id="modal-cancel-btn" data-i18n="modal_button_cancel">Cancel</button>
+            </div>
+        </div>
+    </div>
     
     <script>
         // Global variables
@@ -479,8 +565,32 @@
         let currentServerFilePath = null; 
         let currentTranslationTaskId = null;
         let progressEventSource = null;
+        let modelPullEventSource = null; 
         let currentUILocale = 'ko'; 
         let i18nResources = {};     
+        let isModelInstallationInProgress = false; 
+        let defaultOllamaModel = "gemma3:12b"; 
+        let translatedFileAvailableButNotDownloaded = false; // Flag for undownloaded translation
+
+        // Application States for the main button
+        const APP_STATE = {
+            IDLE: 'idle', 
+            UPLOADING: 'uploading', 
+            ANALYZING: 'analyzing', 
+            TRANSLATING: 'translating', 
+            STOPPING: 'stopping', 
+            COMPLETED_SUCCESS: 'completed_success', 
+            COMPLETED_ERROR: 'completed_error', 
+            DOWNLOADING_MODEL: 'downloading_model',
+            AWAITING_DOWNLOAD_CONFIRMATION: 'awaiting_download_confirmation' // Modal is open
+        };
+        let currentAppState = APP_STATE.IDLE;
+        
+        // Modal callback storage
+        let modalConfirmCallback = null;
+        let modalCancelCallback = null;
+        let modalThirdOptionCallback = null; // For a potential third button
+
 
         // DOM Element References
         const domElements = {
@@ -501,12 +611,11 @@
             targetLangSelect: document.getElementById('tgt-lang'),
             swapLangButton: document.getElementById('swap-lang-btn'),
             modelSelect: document.getElementById('model'),
-            translateButton: document.getElementById('translate-btn'),
+            translateButton: document.getElementById('translate-btn'), 
             progressPanel: document.getElementById('progress-panel'),
             progressFill: document.getElementById('progress-fill'),
             progressStatusDisplay: document.getElementById('progress-status'),
             currentTaskDisplay: document.getElementById('current-task'),
-            downloadButton: document.getElementById('download-btn'),
             logBox: document.getElementById('log-box'),
             ocrTemperatureSlider: document.getElementById('ocr-temp'),
             ocrTemperatureValueDisplay: document.getElementById('ocr-temp-value'),
@@ -514,11 +623,20 @@
             ollamaStatusIndicator: document.querySelector('#server-status .status-indicator'),
             ollamaStatusText: document.getElementById('ollama-status'),
             ollamaStatusLabel: document.getElementById('status-label'),
-            stopTranslationButton: document.getElementById('stop-translation-btn'),
             tabs: document.querySelectorAll('.tabs .tab-group .tab'),
             tabContents: document.querySelectorAll('.panel.full-width > .tab-content'),
             historyTableBody: document.getElementById('history-body'),
-            appTitle: document.getElementById('app-title')
+            appTitle: document.getElementById('app-title'),
+            imageTranslationCheckbox: document.getElementById('image-translation'), 
+            ocrGpuCheckbox: document.getElementById('ocr-gpu'),
+            // Modal elements
+            customModal: document.getElementById('custom-modal'),
+            modalTitle: document.getElementById('modal-title'),
+            modalMessage: document.getElementById('modal-message'),
+            modalConfirmBtn: document.getElementById('modal-confirm-btn'),
+            modalCancelBtn: document.getElementById('modal-cancel-btn')
+            // If a third button is added to the modal HTML:
+            // modalThirdOptionBtn: document.getElementById('modal-third-btn') 
         };
 
         // --- Logging Function ---
@@ -526,36 +644,23 @@
             if (!domElements.logBox) return;
             const logEntry = document.createElement('div');
             logEntry.classList.add(`log-entry-${type}`);
-            
             let displayMessage = messageOrKey;
             if (isKey && i18nResources && i18nResources[messageOrKey]) {
                 displayMessage = i18nResources[messageOrKey];
-                if (interpolateParams) { // Simple interpolation for {param}
-                    for (const key in interpolateParams) {
-                        displayMessage = displayMessage.replace(`{${key}}`, interpolateParams[key]);
-                    }
-                }
-            } else if (interpolateParams) { // Also interpolate for non-key messages if params provided
-                 for (const key in interpolateParams) {
-                    displayMessage = displayMessage.replace(`{${key}}`, interpolateParams[key]);
-                }
-            }
-
-
+                if (interpolateParams) { for (const key in interpolateParams) { displayMessage = displayMessage.replace(new RegExp(`{${key}}`, 'g'), interpolateParams[key]); } }
+            } else if (interpolateParams) { for (const key in interpolateParams) { displayMessage = displayMessage.replace(new RegExp(`{${key}}`, 'g'), interpolateParams[key]); } }
             const timestamp = new Date().toLocaleTimeString();
             logEntry.textContent = `[${timestamp}] ${displayMessage}`;
-            
             domElements.logBox.appendChild(logEntry);
             domElements.logBox.scrollTop = domElements.logBox.scrollHeight;
         }
         
-        // Helper function to add the default/empty model option
-        function addDefaultNoModelsOption(customTextKey = 'no_models_found') { // Takes a key now
+        function addDefaultNoModelsOption(customTextKey = 'no_models_found') { 
             if (domElements.modelSelect) {
                 domElements.modelSelect.innerHTML = ''; 
                 const option = document.createElement('option');
                 option.value = "";
-                option.textContent = (i18nResources && i18nResources[customTextKey]) || customTextKey; // Fallback to key itself
+                option.textContent = (i18nResources && i18nResources[customTextKey]) || customTextKey; 
                 domElements.modelSelect.appendChild(option);
                 domElements.modelSelect.value = ""; 
             }
@@ -585,83 +690,64 @@
             }
         }
         
-        function applyLocalization() {
+        function applyLocalization(elementScope = document) { // Optional scope for specific updates
             console.log("[Localization] Applying localization...");
-            document.querySelectorAll('[data-i18n]').forEach(element => {
+            elementScope.querySelectorAll('[data-i18n]').forEach(element => {
                 const key = element.getAttribute('data-i18n');
-                const fallbackText = element.textContent || element.title || (element.placeholder || ''); 
+                const fallbackText = element.dataset.i18nFallback || element.textContent || element.title || (element.placeholder || ''); 
                 let localizedText = (i18nResources && i18nResources[key]) || fallbackText;
                 
-                if (element.placeholder && (i18nResources && i18nResources[key])) {
-                     element.placeholder = localizedText;
-                } else if (element.title && (i18nResources && i18nResources[key]) && !element.hasAttribute('data-i18n-tooltip')) { 
-                    // Apply to title only if not specifically a tooltip key
-                    element.title = localizedText;
+                // Interpolation for dynamic values like {modelName}
+                const interpolateMatch = localizedText.match(/{[^{}]+}/g);
+                if (interpolateMatch && element.dataset.i18nParams) {
+                    try {
+                        const params = JSON.parse(element.dataset.i18nParams);
+                        for (const placeholder in params) {
+                            localizedText = localizedText.replace(new RegExp(`{${placeholder}}`, 'g'), params[placeholder]);
+                        }
+                    } catch (e) { console.warn("Failed to parse i18n-params for key:", key, e); }
                 }
-                // For elements that should have their textContent updated
-                else if ((element.tagName === 'BUTTON' || element.tagName === 'SPAN' || element.tagName === 'LABEL' || 
-                           element.tagName === 'H1' || element.tagName === 'H2' || element.tagName === 'H3' || 
-                           element.tagName === 'TH' || (element.tagName === 'OPTION' && element.value === "")) &&
-                           (i18nResources && i18nResources[key])) {
-                     element.textContent = localizedText;
-                } else if (element.tagName !== 'INPUT' && element.tagName !== 'SELECT' && (i18nResources && i18nResources[key])) {
-                     element.textContent = localizedText;
-                }
+
+
+                if (element.placeholder && (i18nResources && i18nResources[key])) { element.placeholder = localizedText; }
+                else if (element.title && (i18nResources && i18nResources[key]) && !element.hasAttribute('data-i18n-tooltip')) { element.title = localizedText; }
+                else if ((element.tagName === 'BUTTON' || element.tagName === 'SPAN' || element.tagName === 'LABEL' || element.tagName === 'H1' || element.tagName === 'H2' || element.tagName === 'H3' || element.tagName === 'TH' || element.tagName === 'P' || (element.tagName === 'OPTION' && element.value === "")) && (i18nResources && i18nResources[key])) { element.textContent = localizedText; }
+                else if (element.tagName !== 'INPUT' && element.tagName !== 'SELECT' && (i18nResources && i18nResources[key])) { element.textContent = localizedText; }
             });
-             // Apply to elements targeted by data-i18n-tooltip for titles
-            document.querySelectorAll('[data-i18n-tooltip]').forEach(element => {
+            elementScope.querySelectorAll('[data-i18n-tooltip]').forEach(element => {
                 const key = element.getAttribute('data-i18n-tooltip');
-                if (i18nResources && i18nResources[key]) {
-                    element.title = i18nResources[key];
-                }
+                if (i18nResources && i18nResources[key]) { element.title = i18nResources[key]; }
             });
-
-
-            if(domElements.appTitle) domElements.appTitle.textContent = (i18nResources && i18nResources.app_title) || 'Document Translator';
-            // swapLangButton title is handled by data-i18n-tooltip now
             
-            updateTranslationLanguageOptions(); 
-            updateOllamaStatusDisplay(); 
-            updateTranslateButtonState(); 
-            // Update initial log box text
-            if (domElements.logBox && domElements.logBox.children.length === 1 && domElements.logBox.children[0].tagName === 'SPAN' && domElements.logBox.children[0].hasAttribute('data-i18n')) {
-                const key = domElements.logBox.children[0].getAttribute('data-i18n');
-                if (i18nResources && i18nResources[key]) {
-                    domElements.logBox.children[0].textContent = i18nResources[key];
+            if (elementScope === document) { // Full page localization
+                if(domElements.appTitle) domElements.appTitle.textContent = (i18nResources && i18nResources.app_title) || 'Document Translator';
+                updateTranslationLanguageOptions(); 
+                updateOllamaStatusDisplay(); 
+                updateMainButtonState(); 
+                if (domElements.logBox && domElements.logBox.children.length === 1 && domElements.logBox.children[0].tagName === 'SPAN' && domElements.logBox.children[0].hasAttribute('data-i18n')) {
+                    const key = domElements.logBox.children[0].getAttribute('data-i18n');
+                    if (i18nResources && i18nResources[key]) { domElements.logBox.children[0].textContent = i18nResources[key]; }
                 }
             }
-
-
             console.log("[Localization] Localization applied.");
         }
 
         function updateOllamaStatusDisplay(statusData = null) {
             if(!domElements.ollamaStatusText || !domElements.ollamaStatusLabel) return;
             domElements.ollamaStatusLabel.textContent = (i18nResources && i18nResources.status_label) || 'Status';
-
             if (statusData) {
                 const portText = (i18nResources && i18nResources.ollama_port_label) || 'Port';
                  if (statusData.running) domElements.ollamaStatusText.textContent = `${(i18nResources && i18nResources.ollama_running) || 'Running'} (${portText}: ${statusData.port})`;
                  else if (statusData.installed) domElements.ollamaStatusText.textContent = (i18nResources && i18nResources.ollama_installed_not_running) || 'Installed (not running)';
                  else domElements.ollamaStatusText.textContent = (i18nResources && i18nResources.ollama_not_installed) || 'Not installed';
-            } else {
-                 domElements.ollamaStatusText.textContent = (i18nResources && i18nResources.status_checking) || 'Checking...';
-            }
+            } else { domElements.ollamaStatusText.textContent = (i18nResources && i18nResources.status_checking) || 'Checking...'; }
         }
         
         function updateTranslationLanguageOptions() {
             console.log("[Localization] Updating translation language options...");
-            const langOptionsMap = { 
-                "ko": "translation_lang_ko", "en": "translation_lang_en", "ja": "translation_lang_ja",
-                "zh-CN": "translation_lang_zh_CN", "zh-TW": "translation_lang_zh_TW",
-                "th": "translation_lang_th", "es": "translation_lang_es"
-            };
-
+            const langOptionsMap = { "ko": "translation_lang_ko", "en": "translation_lang_en", "ja": "translation_lang_ja", "zh-CN": "translation_lang_zh_CN", "zh-TW": "translation_lang_zh_TW", "th": "translation_lang_th", "es": "translation_lang_es" };
             [domElements.sourceLangSelect, domElements.targetLangSelect].forEach(selectElement => {
-                if (!selectElement) {
-                    console.warn("Language select dropdown not found for update.");
-                    return;
-                }
+                if (!selectElement) { console.warn("Language select dropdown not found for update."); return; }
                 const currentSelectedValue = selectElement.value;
                 selectElement.innerHTML = ''; 
                 Object.keys(langOptionsMap).forEach(langCode => {
@@ -670,65 +756,180 @@
                     option.textContent = (i18nResources && i18nResources[langOptionsMap[langCode]]) || langCode; 
                     selectElement.appendChild(option);
                 });
-
-                if (currentSelectedValue && Array.from(selectElement.options).some(opt => opt.value === currentSelectedValue)) {
-                    selectElement.value = currentSelectedValue;
-                } else if (selectElement.options.length > 0) {
-                    if (selectElement.id === 'src-lang') {
-                        selectElement.value = (currentUILocale === 'ko' || currentUILocale === 'ja') ? currentUILocale : 'en';
-                    } else if (selectElement.id === 'tgt-lang') {
-                        selectElement.value = (currentUILocale === 'ko') ? 'en' : 'ko';
-                    }
+                if (currentSelectedValue && Array.from(selectElement.options).some(opt => opt.value === currentSelectedValue)) { selectElement.value = currentSelectedValue; }
+                else if (selectElement.options.length > 0) {
+                    if (selectElement.id === 'src-lang') { selectElement.value = (currentUILocale === 'ko' || currentUILocale === 'ja') ? currentUILocale : 'en'; }
+                    else if (selectElement.id === 'tgt-lang') { selectElement.value = (currentUILocale === 'ko') ? 'en' : 'ko'; }
                 }
             });
             console.log("[Localization] Translation language options updated.");
         }
-        
-        // --- Core Application Logic ---
-        let isModelInstallationInProgress = false; // 모델 설치 진행 중 상태 플래그
-        let defaultOllamaModel = "gemma3:12b"; // 기본값, 추후 API에서 받아오도록 변경 가능
 
+        // --- Modal Functions ---
+        function openModal(config) {
+            // config: { titleKey, messageText (pre-formatted), confirmBtnKey, cancelBtnKey, thirdBtnKey (optional), onConfirm, onCancel, onThird (optional) }
+            if (!domElements.customModal || !domElements.modalTitle || !domElements.modalMessage || !domElements.modalConfirmBtn || !domElements.modalCancelBtn) {
+                console.error("Modal elements not found! Falling back to native confirm.");
+                const userConfirmed = confirm(config.messageText); // Fallback uses pre-formatted message
+                if (userConfirmed) { if (config.onConfirm) config.onConfirm(); }
+                else { if (config.onCancel) config.onCancel(); }
+                return;
+            }
+        
+            domElements.modalTitle.textContent = (i18nResources && i18nResources[config.titleKey]) || config.titleKey;
+            domElements.modalTitle.dataset.i18n = config.titleKey;
+        
+            domElements.modalMessage.textContent = config.messageText; // Use pre-formatted message directly
+            // domElements.modalMessage.dataset.i18n = config.messageKey; // If message was a key
+        
+            domElements.modalConfirmBtn.textContent = (i18nResources && i18nResources[config.confirmBtnKey]) || config.confirmBtnKey;
+            domElements.modalConfirmBtn.dataset.i18n = config.confirmBtnKey;
+        
+            domElements.modalCancelBtn.textContent = (i18nResources && i18nResources[config.cancelBtnKey]) || config.cancelBtnKey;
+            domElements.modalCancelBtn.dataset.i18n = config.cancelBtnKey;
+        
+            modalConfirmCallback = config.onConfirm;
+            modalCancelCallback = config.onCancel;
+        
+            // Optional third button
+            const modalThirdBtn = document.getElementById('modal-third-btn'); // Assuming it exists in HTML if thirdBtnKey is provided
+            if (config.thirdBtnKey && modalThirdBtn) {
+                modalThirdBtn.textContent = (i18nResources && i18nResources[config.thirdBtnKey]) || config.thirdBtnKey;
+                modalThirdBtn.dataset.i18n = config.thirdBtnKey;
+                modalThirdOptionCallback = config.onThird;
+                modalThirdBtn.style.display = 'inline-block';
+            } else if (modalThirdBtn) {
+                modalThirdBtn.style.display = 'none';
+                modalThirdOptionCallback = null;
+            }
+        
+            domElements.customModal.style.display = 'flex';
+            setMainButtonState(APP_STATE.AWAITING_DOWNLOAD_CONFIRMATION); // Or a more generic MODAL_OPEN state
+        }
+
+        function closeModal() {
+            if (!domElements.customModal) return;
+            domElements.customModal.style.display = 'none';
+            modalConfirmCallback = null;
+            modalCancelCallback = null;
+            modalThirdOptionCallback = null;
+            // State should be reset by the action that called openModal or the modal's button callbacks.
+            // If the current state is AWAITING_DOWNLOAD_CONFIRMATION, and no button was clicked (e.g. Esc),
+            // we might want to revert to the state before modal was shown.
+            // For simplicity now, callbacks are responsible.
+        }
+
+
+        // --- Core Application Logic ---
+        function setMainButtonState(newState) {
+            currentAppState = newState;
+            if (newState === APP_STATE.COMPLETED_SUCCESS) {
+                translatedFileAvailableButNotDownloaded = true;
+            }
+            if (newState !== APP_STATE.COMPLETED_SUCCESS && newState !== APP_STATE.AWAITING_DOWNLOAD_CONFIRMATION) {
+                // This flag is more robustly handled by resetFileInput and download action
+            }
+            updateMainButtonState();
+        }
+
+        function updateMainButtonState() {
+            if (!domElements.translateButton) return;
+            const fileReady = currentServerFilePath && currentFileObject;
+            const sourceLangSelected = domElements.sourceLangSelect && domElements.sourceLangSelect.value;
+            const targetLangSelected = domElements.targetLangSelect && domElements.targetLangSelect.value;
+            const modelSelected = domElements.modelSelect && domElements.modelSelect.value;
+            const ollamaRunning = domElements.ollamaStatusIndicator && domElements.ollamaStatusIndicator.classList.contains('status-online');
+
+            domElements.translateButton.disabled = true; 
+            domElements.translateButton.classList.remove('stop-button', 'download-button'); 
+
+            switch (currentAppState) {
+                case APP_STATE.IDLE:
+                    domElements.translateButton.textContent = (i18nResources && i18nResources.start_translation_button) || "Start Translation";
+                    if (fileReady && sourceLangSelected && targetLangSelected && modelSelected && ollamaRunning && !isModelInstallationInProgress) {
+                        domElements.translateButton.disabled = false;
+                    }
+                    break;
+                case APP_STATE.TRANSLATING:
+                    domElements.translateButton.textContent = (i18nResources && i18nResources.stop_translation_button) || "Stop Translation";
+                    domElements.translateButton.disabled = false;
+                    domElements.translateButton.classList.add('stop-button'); 
+                    break;
+                case APP_STATE.STOPPING:
+                    domElements.translateButton.textContent = (i18nResources && i18nResources.stopping_translation_button) || "Stopping...";
+                    domElements.translateButton.disabled = true;
+                    break;
+                case APP_STATE.COMPLETED_SUCCESS:
+                    domElements.translateButton.textContent = (i18nResources && i18nResources.download_translated_file_button) || "Download Translated File";
+                    domElements.translateButton.disabled = false;
+                    domElements.translateButton.classList.add('download-button'); 
+                    break;
+                case APP_STATE.COMPLETED_ERROR:
+                    domElements.translateButton.textContent = (i18nResources && i18nResources.start_translation_button_retry) || "Retry Translation"; 
+                    if (fileReady && sourceLangSelected && targetLangSelected && modelSelected && ollamaRunning && !isModelInstallationInProgress) {
+                        domElements.translateButton.disabled = false;
+                    }
+                    break;
+                case APP_STATE.DOWNLOADING_MODEL:
+                    domElements.translateButton.textContent = (i18nResources && i18nResources.model_downloading_button) || "Model Downloading...";
+                    domElements.translateButton.disabled = true;
+                    break;
+                case APP_STATE.AWAITING_DOWNLOAD_CONFIRMATION:
+                    domElements.translateButton.textContent = (i18nResources && i18nResources.start_translation_button) || "Start Translation"; // Or text of action that was interrupted
+                    domElements.translateButton.disabled = true; // Button disabled while modal is open
+                    break;
+                default: 
+                    domElements.translateButton.textContent = (i18nResources && i18nResources.start_translation_button) || "Start Translation";
+                    domElements.translateButton.disabled = true;
+                    break;
+            }
+        }
+        
         async function checkOllamaStatus() {
             if (isModelInstallationInProgress) {
                 console.log("Model installation in progress, skipping Ollama status check.");
                 return;
             }
             console.log("Checking Ollama status...");
-            domElements.ollamaManagementArea.innerHTML = ''; // 이전 관리 컨트롤 초기화
-            domElements.modelInstallationStatus.style.display = 'none';
+            domElements.ollamaManagementArea.innerHTML = ''; // Clear previous management controls
+            // Keep modelInstallationStatus hidden unless actively installing via this new button or other means
+            // domElements.modelInstallationStatus.style.display = 'none'; 
 
             try {
-                const response = await fetch('/api/check_ollama'); // 이 API는 default_model_name도 반환하도록 수정 가능
+                const response = await fetch(`/api/check_ollama?lang=${currentUILocale}`); // Pass lang for potential localized error from backend
                 if (!response.ok) {
-                    // ... (기존 오류 처리) ...
                     const errorText = await response.text().catch(() => `HTTP ${response.status}`);
-                    if (domElements.ollamaStatusIndicator) domElements.ollamaStatusIndicator.classList.add('status-offline');
+                    if (domElements.ollamaStatusIndicator) {
+                        domElements.ollamaStatusIndicator.classList.remove('status-online');
+                        domElements.ollamaStatusIndicator.classList.add('status-offline');
+                    }
                     const apiErrorMsgKey = 'ollama_status_error_api_generic';
                     if (domElements.ollamaStatusText) domElements.ollamaStatusText.textContent = ((i18nResources && i18nResources[apiErrorMsgKey]) || 'API Error: ') + response.status;
+                    // Add log for API error
+                    addLog('log_ollama_status_api_error', true, 'error', { status: response.status, errorText: errorText });
                     throw new Error(`Ollama API response error: ${errorText}`);
                 }
                 const data = await response.json();
                 console.log("Ollama status data received:", data);
-                // 백엔드에서 기본 모델명을 전달받도록 할 수 있음
-                // defaultOllamaModel = data.default_ollama_model || "gemma3:12b";
+                // defaultOllamaModel = data.default_ollama_model || "gemma3:12b"; // If backend sends this
 
-
-                updateOllamaStatusDisplay(data); // Ollama 상태 (설치됨, 실행중 등) UI 업데이트
+                updateOllamaStatusDisplay(data);
                 if (domElements.ollamaStatusIndicator) {
                     domElements.ollamaStatusIndicator.classList.toggle('status-online', data.running);
                     domElements.ollamaStatusIndicator.classList.toggle('status-offline', !data.running);
                 }
 
                 if (!data.installed) {
-                    // 1. Ollama 미설치 시
                     const notInstalledMsg = (i18nResources && i18nResources.ollama_not_installed_prompt) || 'Ollama is not installed. Please download and install it from the official website.';
-                    const downloadLink = `<a href="https://ollama.com/download" target="_blank">${(i18nResources && i18nResources.ollama_download_link_text) || 'Download Ollama'}</a>`;
+                    const downloadLinkText = (i18nResources && i18nResources.ollama_download_link_text) || 'Download Ollama';
+                    const downloadLink = `<a href="https://ollama.com/download" target="_blank" rel="noopener noreferrer">${downloadLinkText}</a>`;
                     domElements.ollamaManagementArea.innerHTML = `<p>${notInstalledMsg} ${downloadLink}</p>`;
-                    addDefaultNoModelsOption('ollama_not_installed_no_models'); // 모델 목록도 업데이트
+                    addDefaultNoModelsOption('ollama_not_installed_no_models');
                 } else if (!data.running) {
-                    // 2. Ollama 비활성화 시 (설치는 되어 있음)
                     const notRunningMsg = (i18nResources && i18nResources.ollama_not_running_prompt) || 'Ollama is installed but not running.';
                     const startButton = document.createElement('button');
+                    startButton.id = 'start-ollama-btn'; // Add ID for potential styling/testing
+                    startButton.className = 'action-button'; // Use existing class if suitable
                     startButton.textContent = (i18nResources && i18nResources.ollama_start_button) || 'Start Ollama';
                     startButton.onclick = async () => {
                         startButton.disabled = true;
@@ -739,9 +940,9 @@
                             const startData = await startResponse.json();
                             if (startData.success) {
                                 addLog('log_ollama_start_success', true, 'success');
-                                setTimeout(checkOllamaStatus, 3000); // 잠시 후 상태 다시 확인
+                                setTimeout(checkOllamaStatus, 3000); // Re-check status after a delay
                             } else {
-                                addLog('log_ollama_start_failed', true, 'error');
+                                addLog('log_ollama_start_failed', true, 'error', { error: startData.error || 'Unknown error' });
                                 startButton.disabled = false;
                                 startButton.textContent = (i18nResources && i18nResources.ollama_start_button) || 'Start Ollama';
                             }
@@ -755,210 +956,223 @@
                     domElements.ollamaManagementArea.appendChild(startButton);
                     addDefaultNoModelsOption('ollama_not_running_no_models');
                 } else {
-                    // Ollama 설치 및 실행 중 -> 모델 목록 처리
-                    populateModelDropdown(data.models); // 아래 정의된 함수 사용
-
-                    // 3. Ollama 모델 부재 시 기본 모델 자동 설치
-                    if (!data.models || data.models.length === 0 || !data.models.includes(defaultOllamaModel)) {
+                    // Ollama installed and running
+                    populateModelDropdown(data.models);
+                    const modelsArray = Array.isArray(data.models) ? data.models.map(m => (typeof m === 'string' ? m : m.name)).filter(name => name) : [];
+                    
+                    if (!isModelInstallationInProgress && !modelsArray.includes(defaultOllamaModel)) {
+                        // Default model is not installed, and no installation is currently in progress.
+                        // Prompt user to install it.
                         const modelToInstall = defaultOllamaModel;
-                        domElements.modelInstallMessage.textContent = ((i18nResources && i18nResources.status_default_model_missing_install_prompt) || `Default model '${modelToInstall}' is not found. Attempting to install...`).replace('{modelName}', modelToInstall);
-                        domElements.modelInstallationStatus.style.display = 'block';
-                        domElements.modelInstallProgressBar.style.display = 'block'; // Show progress bar div
-                        domElements.modelInstallProgressFill.style.width = '0%';
-                        domElements.modelInstallProgressFill.textContent = '0%';
-                        isModelInstallationInProgress = true;
-                        pullOllamaModel(modelToInstall);
-                    }
-                }
+                        let message = ((i18nResources && i18nResources.status_default_model_missing_prompt) || 
+                                       `Default model '{modelName}' is not installed. For optimal translation quality, we recommend installing it.`)
+                                       .replace(/{modelName}/g, modelToInstall); // Use global replace
+                        let installButtonText = ((i18nResources && i18nResources.button_install_default_model) || 
+                                                 `Install {modelName}`).replace(/{modelName}/g, modelToInstall);
 
+                        const installPromptDiv = document.createElement('div');
+                        installPromptDiv.style.marginTop = '5px';
+                        
+                        const messageP = document.createElement('p');
+                        messageP.textContent = message;
+                        messageP.style.display = 'inline'; // Keep message and button on same line if possible
+
+                        const installBtn = document.createElement('button');
+                        installBtn.id = 'install-default-model-btn';
+                        installBtn.className = 'action-button'; // Use a general class
+                        installBtn.style.marginLeft = '10px';
+                        installBtn.textContent = installButtonText;
+                        
+                        installBtn.onclick = async () => {
+                            installBtn.disabled = true;
+                            let installingText = ((i18nResources && i18nResources.button_installing_model) || "Installing {modelName}...")
+                                                 .replace(/{modelName}/g, modelToInstall);
+                            installBtn.textContent = installingText;
+                            // Show model installation progress UI elements before calling pullOllamaModel
+                            domElements.modelInstallMessage.textContent = installingText;
+                            domElements.modelInstallationStatus.style.display = 'block';
+                            domElements.modelInstallProgressBar.style.display = 'block';
+                            domElements.modelInstallProgressFill.style.width = '0%';
+                            domElements.modelInstallProgressFill.textContent = '0%';
+                            
+                            await pullOllamaModel(modelToInstall); // This will set isModelInstallationInProgress = true
+                                                                  // and APP_STATE.DOWNLOADING_MODEL
+                            // After pullOllamaModel completes (success or error), 
+                            // isModelInstallationInProgress will be false, and checkOllamaStatus will be called again.
+                            // The button will be removed then as ollamaManagementArea is cleared.
+                        };
+                        
+                        installPromptDiv.appendChild(messageP);
+                        installPromptDiv.appendChild(installBtn);
+                        domElements.ollamaManagementArea.appendChild(installPromptDiv);
+                        
+                        // Do NOT automatically start pullOllamaModel here.
+                        // User will click the button.
+                    } else if (!isModelInstallationInProgress && modelsArray.includes(defaultOllamaModel)) {
+                        // Default model is available, and no installation is in progress.
+                        // Ensure app state is sensible if it was previously DOWNLOADING_MODEL.
+                        if (currentAppState === APP_STATE.DOWNLOADING_MODEL) {
+                            setMainButtonState(APP_STATE.IDLE);
+                        }
+                    }
+                    // If isModelInstallationInProgress is true, do nothing here, let pullOllamaModel callbacks handle UI.
+                }
             } catch (error) {
-                // ... (기존 예외 처리) ...
                 console.error("Exception during Ollama status check:", error);
-                if (domElements.ollamaStatusIndicator) domElements.ollamaStatusIndicator.classList.add('status-offline');
+                if (domElements.ollamaStatusIndicator) {
+                    domElements.ollamaStatusIndicator.classList.remove('status-online');
+                    domElements.ollamaStatusIndicator.classList.add('status-offline');
+                }
                 if (domElements.ollamaStatusText) domElements.ollamaStatusText.textContent = (i18nResources && i18nResources.ollama_status_exception) || 'Error checking status';
                 if (domElements.modelSelect) addDefaultNoModelsOption('model_load_error');
+                // Reset to IDLE only if not in a modal confirmation state or active translation/download
+                if (currentAppState !== APP_STATE.AWAITING_DOWNLOAD_CONFIRMATION && 
+                    currentAppState !== APP_STATE.TRANSLATING && 
+                    currentAppState !== APP_STATE.DOWNLOADING_MODEL) {
+                    setMainButtonState(APP_STATE.IDLE);
+                }
             }
-            updateTranslateButtonState();
+            updateMainButtonState(); // Update button states based on Ollama status and model availability
         }
-
+        
         async function pullOllamaModel(modelName) {
             addLog('log_model_pull_starting', true, 'info', { modelName: modelName });
-            isModelInstallationInProgress = true; // Set flag
-            domElements.modelInstallMessage.textContent = ((i18nResources && i18nResources.status_model_pulling) || "Downloading model {modelName}...").replace('{modelName}', modelName);
-            domElements.modelInstallProgressBar.style.display = 'block';
-            domElements.modelInstallProgressFill.style.width = '0%';
-            domElements.modelInstallProgressFill.textContent = '0%';
-
+            isModelInstallationInProgress = true; 
+            setMainButtonState(APP_STATE.DOWNLOADING_MODEL); 
+            let message = ((i18nResources && i18nResources.status_model_pulling) || "Downloading model {modelName}...").replace('{modelName}', modelName);
+            domElements.modelInstallMessage.textContent = message;
+            domElements.modelInstallationStatus.style.display = 'block'; domElements.modelInstallProgressBar.style.display = 'block';
+            domElements.modelInstallProgressFill.style.width = '0%'; domElements.modelInstallProgressFill.textContent = '0%';
             try {
-                // 1. Start the pull process on the backend
-                const pullResponse = await fetch('/api/pull_model', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ model_name: modelName })
-                });
+                const pullResponse = await fetch('/api/pull_model', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model_name: modelName, ui_language: currentUILocale }) });
                 const pullData = await pullResponse.json();
-
-                if (!pullResponse.ok || !pullData.success) {
-                    throw new Error(pullData.error || ((i18nResources && i18nResources.error_model_pull_start_failed) || 'Failed to start model download.'));
-                }
-
-                // 2. Listen for progress updates using SSE
-                if (modelPullEventSource) {
-                    modelPullEventSource.close();
-                }
-                modelPullEventSource = new EventSource(`/api/model_pull_progress/${encodeURIComponent(modelName)}`);
-
+                if (!pullResponse.ok || !pullData.success) { throw new Error(pullData.error || ((i18nResources && i18nResources.error_model_pull_start_failed) || 'Failed to start model download.'));}
+                if (modelPullEventSource) { modelPullEventSource.close(); }
+                modelPullEventSource = new EventSource(`/api/model_pull_progress/${encodeURIComponent(modelName)}?lang=${currentUILocale}`);
                 modelPullEventSource.onmessage = function(event) {
-                    const progressData = JSON.parse(event.data);
-                    console.log("Model pull progress:", progressData);
-                    domElements.modelInstallMessage.textContent = progressData.status;
-
-                    if (progressData.total > 0 && progressData.completed >= 0) {
-                        const percentage = Math.round((progressData.completed / progressData.total) * 100);
-                        domElements.modelInstallProgressFill.style.width = `${percentage}%`;
-                        domElements.modelInstallProgressFill.textContent = `${percentage}%`;
-                    } else if (progressData.status.toLowerCase().includes("downloading") || progressData.status.toLowerCase().includes("pulling")) {
-                        // Indeterminate progress if total is not available yet
-                        domElements.modelInstallProgressFill.style.width = '100%'; // Or a looping animation
-                        domElements.modelInstallProgressFill.textContent = ''; // No percentage
+                    const progressData = JSON.parse(event.data); console.log("Model pull progress:", progressData);
+                    let statusMessage = progressData.status;
+                    const statusKey = `model_pull_status_${progressData.status.toLowerCase().replace(/\s+/g, '_')}`;
+                    if (i18nResources && i18nResources[statusKey]) { statusMessage = i18nResources[statusKey]; }
+                    else if (progressData.status === "downloading" && progressData.total > 0 && progressData.completed >=0) { 
+                        statusMessage = ((i18nResources && i18nResources.model_pull_status_downloading_details) || "Downloading ({completedMB}MB / {totalMB}MB)")
+                            .replace("{completedMB}", (progressData.completed / 1024 / 1024).toFixed(1))
+                            .replace("{totalMB}", (progressData.total / 1024 / 1024).toFixed(1));
                     }
-
-
-                    if (progressData.error) {
-                        addLog('log_model_pull_error', true, 'error', { modelName: modelName, details: progressData.status });
-                        modelPullEventSource.close();
-                        isModelInstallationInProgress = false;
-                        domElements.modelInstallationStatus.style.display = 'none';
-                        checkOllamaStatus(); // Refresh status
-                    } else if (progressData.done) {
-                        addLog('log_model_pull_success', true, 'success', { modelName: modelName });
-                        modelPullEventSource.close();
-                        isModelInstallationInProgress = false;
-                        domElements.modelInstallationStatus.style.display = 'none';
-                        checkOllamaStatus(); // Refresh status and model list
-                    }
+                    domElements.modelInstallMessage.textContent = statusMessage;
+                    if (progressData.total > 0 && progressData.completed >= 0) { const percentage = Math.round((progressData.completed / progressData.total) * 100); domElements.modelInstallProgressFill.style.width = `${percentage}%`; domElements.modelInstallProgressFill.textContent = `${percentage}%`; }
+                    else if (progressData.status && (progressData.status.toLowerCase().includes("downloading") || progressData.status.toLowerCase().includes("pulling") || progressData.status.toLowerCase().includes("starting"))) { domElements.modelInstallProgressFill.style.width = '100%'; domElements.modelInstallProgressFill.textContent = ''; }
+                    if (progressData.error) { addLog('log_model_pull_error', true, 'error', { modelName: modelName, details: progressData.error }); modelPullEventSource.close(); isModelInstallationInProgress = false; domElements.modelInstallationStatus.style.display = 'none'; setMainButtonState(APP_STATE.IDLE); checkOllamaStatus(); }
+                    else if (progressData.done) { addLog('log_model_pull_success', true, 'success', { modelName: modelName }); modelPullEventSource.close(); isModelInstallationInProgress = false; domElements.modelInstallationStatus.style.display = 'none'; setMainButtonState(APP_STATE.IDLE); checkOllamaStatus(); }
                 };
-
                 modelPullEventSource.onerror = function(err) {
-                    console.error("Model pull EventSource failed:", err);
-                    addLog('log_model_pull_error_connection', true, 'error', { modelName: modelName });
-                    modelPullEventSource.close();
-                    isModelInstallationInProgress = false;
-                    domElements.modelInstallationStatus.style.display = 'none';
-                    checkOllamaStatus(); // Refresh status
+                    console.error("Model pull EventSource failed:", err); addLog('log_model_pull_error_connection', true, 'error', { modelName: modelName });
+                    if (modelPullEventSource) modelPullEventSource.close(); isModelInstallationInProgress = false; domElements.modelInstallationStatus.style.display = 'none'; setMainButtonState(APP_STATE.IDLE); checkOllamaStatus(); 
                 };
-
             } catch (error) {
-                console.error("Error initiating model pull:", error);
-                addLog('log_model_pull_init_failed', true, 'error', { modelName: modelName, message: error.message });
-                isModelInstallationInProgress = false;
-                domElements.modelInstallationStatus.style.display = 'none';
-                checkOllamaStatus(); // Refresh status
+                console.error("Error initiating model pull:", error); addLog('log_model_pull_init_failed', true, 'error', { modelName: modelName, message: error.message });
+                isModelInstallationInProgress = false; domElements.modelInstallationStatus.style.display = 'none'; setMainButtonState(APP_STATE.IDLE); checkOllamaStatus(); 
             }
         }
 
-        function populateModelDropdown(modelsArray) {
+        function populateModelDropdown(modelsDataFromApi) { 
             if (domElements.modelSelect) {
-                const currentModelVal = domElements.modelSelect.value;
-                domElements.modelSelect.innerHTML = '';
-
-                if (modelsArray && Array.isArray(modelsArray) && modelsArray.length > 0) {
+                const currentModelVal = domElements.modelSelect.value; domElements.modelSelect.innerHTML = ''; let modelsArray = [];
+                if (Array.isArray(modelsDataFromApi)) { modelsArray = modelsDataFromApi.map(model => (typeof model === 'string' ? model : (model && model.name))); }
+                else if (modelsDataFromApi && typeof modelsDataFromApi === 'object' && Array.isArray(modelsDataFromApi.models)) { modelsArray = modelsDataFromApi.models.map(model => model.name); }
+                modelsArray = modelsArray.filter(name => typeof name === 'string' && name.trim() !== '');
+                if (modelsArray && modelsArray.length > 0) {
                     console.log(`[ModelPopulation] Populating with ${modelsArray.length} models:`, modelsArray);
-                    let validModelsFound = 0;
-                    modelsArray.forEach(modelName => {
-                        if (typeof modelName === 'string' && modelName.trim() !== '') {
-                            const option = document.createElement('option');
-                            option.value = modelName;
-                            option.textContent = modelName;
-                            domElements.modelSelect.appendChild(option);
-                            validModelsFound++;
-                        }
-                    });
-
-                    if (validModelsFound > 0) {
-                        const firstValidModel = domElements.modelSelect.options[0].value;
-                        if (currentModelVal && modelsArray.includes(currentModelVal)) {
-                            domElements.modelSelect.value = currentModelVal;
-                        } else {
-                            domElements.modelSelect.value = firstValidModel;
-                        }
-                        console.log(`[ModelPopulation] Model selection set to: ${domElements.modelSelect.value}`);
-                    } else {
-                         addDefaultNoModelsOption('no_models_found');
-                    }
-                } else {
-                    addDefaultNoModelsOption('no_models_found');
-                }
-            } else {
-                console.error("[ModelPopulation] CRITICAL: domElements.modelSelect not found!");
-            }
+                    modelsArray.forEach(modelName => { const option = document.createElement('option'); option.value = modelName; option.textContent = modelName; domElements.modelSelect.appendChild(option); });
+                    if (modelsArray.includes(defaultOllamaModel)) { domElements.modelSelect.value = defaultOllamaModel; }
+                    else if (currentModelVal && modelsArray.includes(currentModelVal)) { domElements.modelSelect.value = currentModelVal; }
+                    else if (domElements.modelSelect.options.length > 0) { domElements.modelSelect.value = domElements.modelSelect.options[0].value; }
+                    console.log(`[ModelPopulation] Model selection set to: ${domElements.modelSelect.value}`);
+                } else { addDefaultNoModelsOption('no_models_found'); }
+            } else { console.error("[ModelPopulation] CRITICAL: domElements.modelSelect not found!"); }
+            updateMainButtonState(); 
         }
-
-
-        let modelPullEventSource = null;
-
         
-        function updateTranslateButtonState() {
-            const fileReady = currentServerFilePath && currentFileObject;
-            const sourceLangSelected = domElements.sourceLangSelect && domElements.sourceLangSelect.value;
-            const targetLangSelected = domElements.targetLangSelect && domElements.targetLangSelect.value;
-            const modelSelected = domElements.modelSelect && domElements.modelSelect.value;
-
-            if (domElements.translateButton) {
-                domElements.translateButton.disabled = !(fileReady && sourceLangSelected && targetLangSelected && modelSelected);
+        function confirmAndProceedWithNewTask(actionCallback, revertAction = null) {
+            if (translatedFileAvailableButNotDownloaded && currentAppState === APP_STATE.COMPLETED_SUCCESS) {
+                openModal({
+                    titleKey: 'modal_new_task_title',      
+                    messageText: (i18nResources.modal_new_task_message || "Translated file has not been downloaded. Start a new task anyway?"), // Pre-formatted
+                    confirmBtnKey: 'modal_button_yes_proceed',  
+                    cancelBtnKey: 'modal_button_no_cancel',    
+                    onConfirm: () => { 
+                        addLog('log_user_confirmed_new_task', true, 'info');
+                        resetFileInput(); 
+                        actionCallback(); 
+                    },
+                    onCancel: () => { 
+                        addLog('log_user_cancelled_new_task', true, 'info');
+                        if (revertAction) { revertAction(); }
+                        setMainButtonState(APP_STATE.COMPLETED_SUCCESS); 
+                    }
+                });
+                return false; 
+            } else {
+                if (currentAppState !== APP_STATE.IDLE &&
+                    currentAppState !== APP_STATE.UPLOADING && 
+                    currentAppState !== APP_STATE.ANALYZING &&
+                    currentAppState !== APP_STATE.DOWNLOADING_MODEL 
+                    ) {
+                    resetFileInput(); 
+                }
+                actionCallback(); 
+                return true; 
             }
         }
+
 
         async function handleFileSelect(file) {
             if (!file) return;
 
-            if (!file.name.toLowerCase().endsWith('.pptx')) {
-                addLog('error_invalid_file_type_pptx', true, 'error');
-                resetFileInput();
-                return;
-            }
-
-            currentFileObject = file;
-            if (domElements.fileNameDisplay) domElements.fileNameDisplay.textContent = file.name;
-            if (domElements.fileUploadLabel) domElements.fileUploadLabel.textContent = file.name; 
-
-            addLog('file_analyzing', true, 'info');
-            if (domElements.fileInfoBox) domElements.fileInfoBox.style.display = 'none';
-            if (domElements.translateButton) domElements.translateButton.disabled = true;
-
-            const formData = new FormData();
-            formData.append('file', currentFileObject);
-
-            try {
-                const response = await fetch('/api/file_info', {
-                    method: 'POST',
-                    body: formData
-                });
-                const data = await response.json();
-
-                if (response.ok && data.filepath) {
-                    currentServerFilePath = data.filepath;
-                    if (domElements.fileNameDisplay) domElements.fileNameDisplay.textContent = data.filename || currentFileObject.name;
-                    if (domElements.slideCountDisplay) domElements.slideCountDisplay.textContent = data.info.slide_count ?? '-';
-                    if (domElements.textCountDisplay) domElements.textCountDisplay.textContent = `${data.info.text_elements_count ?? '-'} (${data.info.total_text_char_count ?? '-'})`;
-                    if (domElements.imageCountDisplay) domElements.imageCountDisplay.textContent = data.info.image_elements_count ?? '-';
-                    if (domElements.chartCountDisplay) domElements.chartCountDisplay.textContent = data.info.chart_elements_count ?? '-';
-                    if (domElements.fileInfoBox) domElements.fileInfoBox.style.display = 'block';
-                    addLog('file_analysis_complete', true, 'success');
-                } else {
-                    throw new Error(data.error || ((i18nResources && i18nResources.error_file_analysis_failed) || 'File analysis failed'));
+            const processFileSelectionActual = async () => { 
+                setMainButtonState(APP_STATE.UPLOADING);
+                if (!file.name.toLowerCase().endsWith('.pptx')) {
+                    addLog('error_invalid_file_type_pptx', true, 'error'); resetFileInput(); return;
                 }
-            } catch (error) {
-                console.error("File processing error:", error);
-                addLog('error_file_processing', true, 'error', { message: error.message });
-                resetFileInput();
-            }
-            updateTranslateButtonState();
+                currentFileObject = file; 
+                if (domElements.fileNameDisplay) domElements.fileNameDisplay.textContent = file.name;
+                if (domElements.fileUploadLabel) domElements.fileUploadLabel.textContent = file.name; 
+                addLog('file_analyzing', true, 'info'); 
+                if (domElements.fileInfoBox) domElements.fileInfoBox.style.display = 'none'; 
+                setMainButtonState(APP_STATE.ANALYZING); 
+                const formData = new FormData(); formData.append('file', currentFileObject);
+                try {
+                    const response = await fetch('/api/file_info', { method: 'POST', body: formData });
+                    const data = await response.json();
+                    if (response.ok && data.filepath) {
+                        currentServerFilePath = data.filepath;
+                        if (domElements.fileNameDisplay) domElements.fileNameDisplay.textContent = data.filename || currentFileObject.name;
+                        if (domElements.slideCountDisplay) domElements.slideCountDisplay.textContent = data.info.slide_count ?? '-';
+                        if (domElements.textCountDisplay) domElements.textCountDisplay.textContent = `${data.info.text_elements_count ?? '-'} (${data.info.total_text_char_count ?? '-'})`;
+                        if (domElements.imageCountDisplay) domElements.imageCountDisplay.textContent = data.info.image_elements_count ?? '-';
+                        if (domElements.chartCountDisplay) domElements.chartCountDisplay.textContent = data.info.chart_elements_count ?? '-';
+                        if (domElements.fileInfoBox) domElements.fileInfoBox.style.display = 'block';
+                        addLog('file_analysis_complete', true, 'success');
+                        setMainButtonState(APP_STATE.IDLE);
+                    } else { throw new Error(data.error || ((i18nResources && i18nResources.error_file_analysis_failed) || 'File analysis failed')); }
+                } catch (error) {
+                    console.error("File processing error:", error); addLog('error_file_processing', true, 'error', { message: error.message });
+                    resetFileInput();
+                }
+            };
+            
+            confirmAndProceedWithNewTask(processFileSelectionActual, () => {
+                if (domElements.fileInput) { domElements.fileInput.value = ""; }
+                if (domElements.fileUploadLabel) {
+                   domElements.fileUploadLabel.textContent = (currentFileObject ? currentFileObject.name : ((i18nResources && i18nResources.file_upload_label) || 'Select or drag and drop a PowerPoint file here'));
+                }
+            });
         }
 
+
         function resetFileInput() {
-            currentFileObject = null;
-            currentServerFilePath = null;
+            currentFileObject = null; currentServerFilePath = null; currentTranslationTaskId = null; 
+            translatedFileAvailableButNotDownloaded = false; 
             if (domElements.fileInput) domElements.fileInput.value = ''; 
             if (domElements.fileUploadLabel) domElements.fileUploadLabel.textContent = (i18nResources && i18nResources.file_upload_label) || 'Select or drag and drop a PowerPoint file here';
             if (domElements.fileInfoBox) domElements.fileInfoBox.style.display = 'none';
@@ -967,262 +1181,257 @@
             if (domElements.textCountDisplay) domElements.textCountDisplay.textContent = '-';
             if (domElements.imageCountDisplay) domElements.imageCountDisplay.textContent = '-';
             if (domElements.chartCountDisplay) domElements.chartCountDisplay.textContent = '-';
-            updateTranslateButtonState();
+            if(domElements.progressPanel) domElements.progressPanel.style.display = 'none';
+            if(domElements.progressFill) { domElements.progressFill.style.width = '0%'; domElements.progressFill.textContent = '0%'; }
+            if(domElements.progressStatusDisplay) domElements.progressStatusDisplay.textContent = (i18nResources && i18nResources.status_preparing) || "Preparing...";
+            setMainButtonState(APP_STATE.IDLE); 
         }
         
         function startProgressMonitoring(taskId) {
             console.log(`[Progress] Monitoring started for task ID: ${taskId}`);
-            if (progressEventSource) {
-                progressEventSource.close();
-            }
-            progressEventSource = new EventSource(`/api/progress/${taskId}`);
-
+            if (progressEventSource) { progressEventSource.close(); }
+            progressEventSource = new EventSource(`/api/progress/${taskId}?lang=${currentUILocale}`); 
             progressEventSource.onmessage = function(event) {
                 const data = JSON.parse(event.data);
-                if (domElements.progressFill) {
-                    domElements.progressFill.style.width = `${data.progress}%`;
-                    domElements.progressFill.textContent = `${data.progress}%`;
-                }
-                if (domElements.progressStatusDisplay) domElements.progressStatusDisplay.textContent = data.status; // Should be localized from backend
+                if (domElements.progressFill) { domElements.progressFill.style.width = `${data.progress}%`; domElements.progressFill.textContent = `${data.progress}%`; }
+                // Status is now expected to be localized by the backend or using keys
+                let statusText = data.status; 
+                // if (data.status_key && i18nResources[data.status_key]) {
+                //     statusText = i18nResources[data.status_key];
+                //     if (data.status_params) { // For interpolation like "{slide_num}"
+                //          for(const pKey in data.status_params) { statusText = statusText.replace(`{${pKey}}`, data.status_params[pKey]); }
+                //     }
+                // }
+                if (domElements.progressStatusDisplay) domElements.progressStatusDisplay.textContent = statusText;
                 if (domElements.currentTaskDisplay) domElements.currentTaskDisplay.textContent = data.current_task || "";
-
                 if (data.completed) {
-                    progressEventSource.close();
-                    if (domElements.stopTranslationButton) domElements.stopTranslationButton.style.display = 'none';
+                    progressEventSource.close(); 
                     if (data.download_url && !data.error) {
-                        if (domElements.downloadButton) {
-                            domElements.downloadButton.onclick = () => window.location.href = data.download_url;
-                            domElements.downloadButton.style.display = 'block';
-                        }
+                        setMainButtonState(APP_STATE.COMPLETED_SUCCESS); 
                         addLog("translation_completed_download", true, "success");
                     } else if (data.error) {
                         addLog('log_translation_error_generic', true, "error", { error: data.error });
-                    } else {
+                        setMainButtonState(APP_STATE.COMPLETED_ERROR);
+                    } else { 
                          addLog("translation_completed_no_download", true, "info");
+                         if (currentAppState !== APP_STATE.STOPPING && currentAppState !== APP_STATE.IDLE) { setMainButtonState(APP_STATE.COMPLETED_ERROR); }
+                         else if (currentAppState === APP_STATE.STOPPING) { setMainButtonState(APP_STATE.IDLE); }
                     }
                 }
             };
             progressEventSource.onerror = function(err) {
-                console.error("EventSource failed:", err);
-                addLog('error_progress_connection', true, "error");
-                progressEventSource.close();
-                if (domElements.stopTranslationButton) domElements.stopTranslationButton.style.display = 'none';
+                console.error("EventSource failed:", err); addLog('error_progress_connection', true, "error");
+                if (progressEventSource) progressEventSource.close(); setMainButtonState(APP_STATE.COMPLETED_ERROR); 
             };
         }
-        
+
         async function loadHistory() {
-            if(!domElements.historyTableBody) {
-                console.error("History table body not found.");
-                addLog('error_history_area_not_found', true, 'error');
-                return;
-            }
+            if(!domElements.historyTableBody) { console.error("History table body not found."); addLog('error_history_area_not_found', true, 'error'); return; }
             try {
                 console.log("Requesting history data...");
-                const response = await fetch('/api/history');
-                if (!response.ok) {
-                    const errorText = await response.text().catch(() => `HTTP ${response.status}`);
-                    addLog('error_history_load_status', true, 'error', { status: errorText });
-                    console.error("History API request failed:", response.status, errorText);
-                    return; 
-                }
-                const historyData = await response.json();
-                console.log("History data received:", historyData);
-                
+                const response = await fetch(`/api/history?lang=${currentUILocale}`); // Pass UI lang for status localization
+                if (!response.ok) { const errorText = await response.text().catch(() => `HTTP ${response.status}`); addLog('error_history_load_status', true, 'error', { status: errorText }); console.error("History API request failed:", response.status, errorText); return; }
+                const historyData = await response.json(); console.log("History data received:", historyData);
                 domElements.historyTableBody.innerHTML = ''; 
                 if (Array.isArray(historyData)) { 
                     historyData.slice(0, 20).forEach(item => { 
                         if (typeof item === 'object' && item !== null) { 
                             const tr = document.createElement('tr');
-                            tr.innerHTML = `
-                                <td>${item.name || '-'}</td> <td>${item.src || '-'}</td>
-                                <td>${item.tgt || '-'}</td> <td>${item.model || '-'}</td>
-                                <td>${item.status || '-'}</td> <td>${item.time || '-'}</td>
-                            `;
+                            // 'status' field is now pre-localized by backend based on 'lang' query param
+                            tr.innerHTML = `<td>${item.name || '-'}</td> <td>${item.src || '-'}</td><td>${item.tgt || '-'}</td> <td>${item.model || '-'}</td><td>${item.status || item.status_key || '-'}</td> <td>${item.time || '-'}</td>`;
                             domElements.historyTableBody.appendChild(tr);
-                        } else { 
-                            console.warn("Invalid history item format:", item);
-                        }
+                        } else { console.warn("Invalid history item format:", item); }
                     });
-                } else { 
-                    console.warn("History data is not an array:", historyData);
-                    addLog('warning_history_invalid_format', true, 'warning');
+                } else { console.warn("History data is not an array:", historyData); addLog('warning_history_invalid_format', true, 'warning');}
+            } catch (error) { console.error("Exception loading history:", error); addLog('error_history_load_exception', true, 'error', { message: error.message }); }
+        }
+
+        async function startActualTranslation() {
+            if (!currentServerFilePath || !currentFileObject) {
+                addLog('error_no_file_for_translation', true, 'error');
+                return;
+            }
+            console.log('[Event] Starting actual translation process...');
+            setMainButtonState(APP_STATE.TRANSLATING); 
+            
+            if(domElements.progressPanel) domElements.progressPanel.style.display = 'block';
+            if(domElements.progressFill) { domElements.progressFill.style.width = '0%'; domElements.progressFill.textContent = '0%'; }
+            if(domElements.progressStatusDisplay) domElements.progressStatusDisplay.textContent = (i18nResources && i18nResources.status_translation_starting) || "Translation starting...";
+            
+            const payload = { 
+                filepath: currentServerFilePath, 
+                src_lang: domElements.sourceLangSelect.value, 
+                tgt_lang: domElements.targetLangSelect.value, 
+                model: domElements.modelSelect.value, 
+                image_translation: domElements.imageTranslationCheckbox.checked, 
+                ocr_temperature: parseFloat(domElements.ocrTemperatureSlider.value), 
+                ocr_use_gpu: domElements.ocrGpuCheckbox.checked, 
+                ui_language: currentUILocale 
+            };
+            try {
+                const response = await fetch('/api/translate', { 
+                    method: 'POST', headers: { 'Content-Type': 'application/json' }, 
+                    body: JSON.stringify(payload) 
+                });
+                const data = await response.json();
+                if (response.ok && data.task_id) { 
+                    currentTranslationTaskId = data.task_id; 
+                    addLog('log_translation_task_started_id', true, 'info', { taskId: currentTranslationTaskId }); 
+                    startProgressMonitoring(currentTranslationTaskId); 
                 }
+                else { throw new Error(data.error || ((i18nResources && i18nResources.error_translation_start_failed) || "Failed to start translation task")); }
             } catch (error) { 
-                console.error("Exception loading history:", error);
-                addLog('error_history_load_exception', true, 'error', { message: error.message });
+                console.error("Error starting translation:", error); 
+                addLog('error_starting_translation_exception', true, 'error', { message: error.message }); 
+                setMainButtonState(APP_STATE.COMPLETED_ERROR); 
+                if(domElements.progressPanel) domElements.progressPanel.style.display = 'none'; 
             }
         }
 
         // --- Event Listeners Setup ---
         function setupEventListeners() {
-            if(domElements.uiLanguageSelect) {
-                domElements.uiLanguageSelect.addEventListener('change', (e) => {
-                    console.log('[Event] UI language changed to:', e.target.value);
-                    loadAndSetLanguageResources(e.target.value);
-                });
-            }
-
+            if(domElements.uiLanguageSelect) { domElements.uiLanguageSelect.addEventListener('change', (e) => { console.log('[Event] UI language changed to:', e.target.value); loadAndSetLanguageResources(e.target.value); }); }
             if(domElements.swapLangButton && domElements.sourceLangSelect && domElements.targetLangSelect) {
                 domElements.swapLangButton.addEventListener('click', () => {
                     console.log('[Event] Swap languages button clicked.');
-                    const sourceVal = domElements.sourceLangSelect.value;
-                    const targetVal = domElements.targetLangSelect.value;
-                    domElements.sourceLangSelect.value = targetVal;
-                    domElements.targetLangSelect.value = sourceVal;
-                    updateTranslateButtonState(); 
+                    const sourceVal = domElements.sourceLangSelect.value; const targetVal = domElements.targetLangSelect.value;
+                    domElements.sourceLangSelect.value = targetVal; domElements.targetLangSelect.value = sourceVal;
+                    updateMainButtonState(); 
                 });
             }
-            
             if (domElements.fileInput) {
-                domElements.fileInput.addEventListener('change', (e) => handleFileSelect(e.target.files[0]));
+                domElements.fileInput.addEventListener('change', (e) => {
+                    if (e.target.files && e.target.files.length > 0) { handleFileSelect(e.target.files[0]); }
+                    else { if (!currentFileObject) { if (domElements.fileUploadLabel) { domElements.fileUploadLabel.textContent = (i18nResources && i18nResources.file_upload_label) || 'Select or drag and drop a PowerPoint file here'; } } }
+                });
             }
-
             if (domElements.fileUploadLabel && domElements.fileInput) {
-                ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-                    domElements.fileUploadLabel.addEventListener(eventName, preventDefaults, false);
-                    document.body.addEventListener(eventName, preventDefaults, false); 
-                });
-
-                function preventDefaults(e) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                }
-
-                ['dragenter', 'dragover'].forEach(eventName => {
-                    domElements.fileUploadLabel.addEventListener(eventName, () => {
-                        domElements.fileUploadLabel.classList.add('dragover-active');
-                        domElements.fileUploadLabel.textContent = (i18nResources && i18nResources.file_drop_prompt) || 'Drop the file here';
-                    }, false);
-                });
-
-                domElements.fileUploadLabel.addEventListener('dragleave', () => {
-                    domElements.fileUploadLabel.classList.remove('dragover-active');
-                    const originalLabelKey = 'file_upload_label';
-                    domElements.fileUploadLabel.textContent = currentFileObject ? currentFileObject.name : ((i18nResources && i18nResources[originalLabelKey]) || 'Select or drag and drop a PowerPoint file here');
-                }, false);
-
+                ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => { domElements.fileUploadLabel.addEventListener(eventName, preventDefaults, false); document.body.addEventListener(eventName, preventDefaults, false); });
+                function preventDefaults(e) { e.preventDefault(); e.stopPropagation(); }
+                ['dragenter', 'dragover'].forEach(eventName => { domElements.fileUploadLabel.addEventListener(eventName, () => { domElements.fileUploadLabel.classList.add('dragover-active'); domElements.fileUploadLabel.textContent = (i18nResources && i18nResources.file_drop_prompt) || 'Drop the file here'; }, false); });
+                domElements.fileUploadLabel.addEventListener('dragleave', () => { domElements.fileUploadLabel.classList.remove('dragover-active'); const originalLabelKey = 'file_upload_label'; domElements.fileUploadLabel.textContent = currentFileObject ? currentFileObject.name : ((i18nResources && i18nResources[originalLabelKey]) || 'Select or drag and drop a PowerPoint file here'); }, false);
                 domElements.fileUploadLabel.addEventListener('drop', async (e) => {
-                    domElements.fileUploadLabel.classList.remove('dragover-active');
-                    const droppedFiles = e.dataTransfer.files;
-                    if (droppedFiles.length > 0) {
-                        handleFileSelect(droppedFiles[0]); 
-                    } else {
-                        const originalLabelKey = 'file_upload_label';
-                        domElements.fileUploadLabel.textContent = (i18nResources && i18nResources[originalLabelKey]) || 'Select or drag and drop a PowerPoint file here';
-                    }
+                    domElements.fileUploadLabel.classList.remove('dragover-active'); const droppedFiles = e.dataTransfer.files;
+                    if (droppedFiles.length > 0) { handleFileSelect(droppedFiles[0]); } 
+                    else { const originalLabelKey = 'file_upload_label'; domElements.fileUploadLabel.textContent = (i18nResources && i18nResources[originalLabelKey]) || 'Select or drag and drop a PowerPoint file here'; }
                 }, false);
             }
-
             [domElements.sourceLangSelect, domElements.targetLangSelect, domElements.modelSelect].forEach(selectElement => {
-                if (selectElement) selectElement.addEventListener('change', updateTranslateButtonState);
+                if (selectElement) {
+                    let previousValue = selectElement.value; 
+                    selectElement.addEventListener('focus', () => { previousValue = selectElement.value; });
+                    selectElement.addEventListener('change', (event) => {
+                        const applyChange = () => { previousValue = selectElement.value; updateMainButtonState(); };
+                        const revertChange = () => { event.target.value = previousValue; updateMainButtonState(); /* Also update button state if reverted */ };
+                        confirmAndProceedWithNewTask(applyChange, revertChange);
+                    });
+                }
             });
-            
-            if(domElements.ocrTemperatureSlider && domElements.ocrTemperatureValueDisplay) {
-                domElements.ocrTemperatureSlider.addEventListener('input', (e) => {
-                    domElements.ocrTemperatureValueDisplay.textContent = e.target.value;
-                });
-            }
+            if(domElements.ocrTemperatureSlider && domElements.ocrTemperatureValueDisplay) { domElements.ocrTemperatureSlider.addEventListener('input', (e) => { domElements.ocrTemperatureValueDisplay.textContent = e.target.value; });}
             
             if(domElements.translateButton) {
                 domElements.translateButton.addEventListener('click', async () => {
-                    if (!currentServerFilePath || !currentFileObject) {
-                        addLog('error_no_file_for_translation', true, 'error');
-                        return;
-                    }
-                    console.log('[Event] Translate button clicked.');
-                    domElements.translateButton.disabled = true;
-                    if(domElements.progressPanel) domElements.progressPanel.style.display = 'block';
-                    if(domElements.progressFill) {
-                         domElements.progressFill.style.width = '0%';
-                         domElements.progressFill.textContent = '0%';
-                    }
-                    if(domElements.progressStatusDisplay) domElements.progressStatusDisplay.textContent = (i18nResources && i18nResources.status_translation_starting) || "Translation starting...";
-                    if(domElements.downloadButton) domElements.downloadButton.style.display = 'none';
-                    if(domElements.stopTranslationButton) domElements.stopTranslationButton.style.display = 'block';
+                    switch (currentAppState) {
+                        case APP_STATE.IDLE:
+                            const selectedModel = domElements.modelSelect.value;
+                            const availableModels = Array.from(domElements.modelSelect.options).map(opt => opt.value).filter(val => val !== ""); // Filter out "Loading..." or "No models"
+                            const isDefaultModelAvailable = availableModels.includes(defaultOllamaModel);
 
-                    const payload = {
-                        filepath: currentServerFilePath,
-                        src_lang: domElements.sourceLangSelect.value,
-                        tgt_lang: domElements.targetLangSelect.value,
-                        model: domElements.modelSelect.value,
-                        image_translation: document.getElementById('image-translation').checked,
-                        ocr_temperature: parseFloat(domElements.ocrTemperatureSlider.value),
-                        ocr_use_gpu: document.getElementById('ocr-gpu').checked,
-                        ui_language: currentUILocale
-                    };
-
-                    try {
-                        const response = await fetch('/api/translate', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(payload)
-                        });
-                        const data = await response.json();
-                        if (response.ok && data.task_id) {
-                            currentTranslationTaskId = data.task_id;
-                            addLog('log_translation_task_started_id', true, 'info', { taskId: currentTranslationTaskId });
-                            startProgressMonitoring(currentTranslationTaskId);
-                        } else {
-                             throw new Error(data.error || ((i18nResources && i18nResources.error_translation_start_failed) || "Failed to start translation task"));
-                        }
-                    } catch (error) {
-                        console.error("Error starting translation:", error);
-                        addLog('error_starting_translation_exception', true, 'error', { message: error.message });
-                        if(domElements.translateButton) domElements.translateButton.disabled = false; 
-                        if(domElements.progressPanel) domElements.progressPanel.style.display = 'none';
-                        if(domElements.stopTranslationButton) domElements.stopTranslationButton.style.display = 'none';
+                            if (!isDefaultModelAvailable && selectedModel && selectedModel !== defaultOllamaModel && availableModels.length > 0) {
+                                addLog('log_gemma_recommendation_shown', true, 'info', {defaultModelName: defaultOllamaModel});
+                                let message = (i18nResources.modal_recommend_gemma_message || 
+                                               "Translation is possible with your selected model ({selectedModel}), but for optimal quality, we recommend using the '{defaultModelName}' model. It's not currently installed. Download '{defaultModelName}' now?")
+                                               .replace(/{defaultModelName}/g, defaultOllamaModel)
+                                               .replace(/{selectedModel}/g, selectedModel);
+                                openModal({
+                                    titleKey: 'modal_recommend_gemma_title',
+                                    messageText: message,
+                                    confirmBtnKey: 'modal_button_download_gemma',
+                                    cancelBtnKey: 'modal_button_proceed_anyway',
+                                    // Optional: thirdBtnKey: 'modal_button_cancel_recommendation',
+                                    onConfirm: () => { // Download defaultOllamaModel
+                                        addLog('log_user_chose_to_download_gemma', true, 'info', {defaultModelName: defaultOllamaModel});
+                                        pullOllamaModel(defaultOllamaModel); 
+                                    },
+                                    onCancel: () => { // Proceed with current model
+                                        addLog('log_user_proceeded_without_gemma', true, 'info', { selectedModel: selectedModel });
+                                        startActualTranslation();
+                                    }
+                                    // Optional: onThird: () => { setMainButtonState(APP_STATE.IDLE); /* Just close modal */ }
+                                });
+                            } else {
+                                startActualTranslation();
+                            }
+                            break;
+                        case APP_STATE.TRANSLATING:
+                            console.log(`[Event] Translate button clicked: Stop Translation for task: ${currentTranslationTaskId}`);
+                            if (currentTranslationTaskId) {
+                                setMainButtonState(APP_STATE.STOPPING); addLog('translation_stopping_task', true, 'info', { taskId: currentTranslationTaskId });
+                                try {
+                                    const response = await fetch(`/api/stop_translation/${currentTranslationTaskId}`, { method: 'POST' });
+                                    const data = await response.json();
+                                    if (response.ok) { addLog('log_translation_stop_signal_sent', true, 'success'); }
+                                    else { throw new Error(data.error || ((i18nResources && i18nResources.error_sending_stop_signal) || "Failed to send stop signal")); }
+                                } catch (error) { console.error("Error stopping translation:", error); addLog('error_stopping_translation_exception', true, 'error', { message: error.message }); setMainButtonState(APP_STATE.TRANSLATING); }
+                            } else { addLog('warning_no_active_task_to_stop', true, 'warning'); setMainButtonState(APP_STATE.IDLE); }
+                            break;
+                        case APP_STATE.COMPLETED_SUCCESS:
+                            console.log(`[Event] Translate button clicked: Download File for task: ${currentTranslationTaskId}`);
+                            if (currentTranslationTaskId) {
+                                window.location.href = `/api/download/${currentTranslationTaskId}`;
+                                addLog('log_download_initiated', true, 'info', { taskId: currentTranslationTaskId });
+                                translatedFileAvailableButNotDownloaded = false; 
+                                resetFileInput(); 
+                            } else { addLog('error_no_taskid_for_download', true, 'error'); setMainButtonState(APP_STATE.IDLE); }
+                            break;
+                        case APP_STATE.COMPLETED_ERROR:
+                             addLog('log_action_on_error_state', true, 'info'); resetFileInput(); 
+                             break;
+                        default: console.log(`[Event] Translate button clicked in unhandled state: ${currentAppState}`); break;
                     }
                 });
             }
-            
             if(domElements.tabs && domElements.tabContents) {
                 domElements.tabs.forEach(tab => {
                     tab.addEventListener('click', () => {
-                        const tabName = tab.dataset.tab;
-                        console.log('[Event] Tab clicked:', tabName);
-                        
-                        domElements.tabs.forEach(t => t.classList.remove('active'));
-                        tab.classList.add('active');
-                        
+                        const tabName = tab.dataset.tab; console.log('[Event] Tab clicked:', tabName);
+                        domElements.tabs.forEach(t => t.classList.remove('active')); tab.classList.add('active');
                         domElements.tabContents.forEach(content => content.classList.remove('active'));
-
                         const activeContent = document.getElementById(`${tabName}-tab`);
-                        if (activeContent) {
-                            activeContent.classList.add('active');
-                            console.log(`Tab content ${activeContent.id} activated.`);
-                        } else {
-                            console.error(`Tab content with ID '${tabName}-tab' not found.`);
-                        }
-                        
-                        if (tabName === 'history') {
-                            console.log('History tab activated, loading history...');
-                            loadHistory();
-                        }
+                        if (activeContent) { activeContent.classList.add('active'); console.log(`Tab content ${activeContent.id} activated.`); }
+                        else { console.error(`Tab content with ID '${tabName}-tab' not found.`); }
+                        if (tabName === 'history') { console.log('History tab activated, loading history...'); loadHistory(); }
                     });
                 });
-            } else {
-                console.error("Tabs or tab contents not found; tab switching logic cannot be set up.");
-            }
+            } else { console.error("Tabs or tab contents not found; tab switching logic cannot be set up."); }
 
-            if(domElements.stopTranslationButton) {
-                domElements.stopTranslationButton.addEventListener('click', async () => {
-                    if (currentTranslationTaskId) {
-                        console.log(`[Event] Stop translation button clicked for task: ${currentTranslationTaskId}`);
-                        addLog('translation_stopping_task', true, 'info', { taskId: currentTranslationTaskId });
-                        try {
-                            const response = await fetch(`/api/stop_translation/${currentTranslationTaskId}`, { method: 'POST' });
-                            const data = await response.json();
-                            if (response.ok) {
-                                addLog('log_translation_stop_signal_sent', true, 'success');
-                            } else {
-                                throw new Error(data.error || ((i18nResources && i18nResources.error_sending_stop_signal) || "Failed to send stop signal"));
-                            }
-                        } catch (error) {
-                            console.error("Error stopping translation:", error);
-                            addLog('error_stopping_translation_exception', true, 'error', { message: error.message });
-                        }
-                    } else {
-                        addLog('warning_no_active_task_to_stop', true, 'warning');
+            // Modal button event listeners
+            if (domElements.modalConfirmBtn) {
+                domElements.modalConfirmBtn.addEventListener('click', () => {
+                    if (modalConfirmCallback) { modalConfirmCallback(); }
+                    closeModal();
+                });
+            }
+            if (domElements.modalCancelBtn) {
+                domElements.modalCancelBtn.addEventListener('click', () => {
+                    if (modalCancelCallback) { modalCancelCallback(); }
+                    closeModal();
+                });
+            }
+            // Optional: Listener for a third modal button if you add one
+            const modalThirdBtn = document.getElementById('modal-third-btn');
+            if (modalThirdBtn) {
+                modalThirdBtn.addEventListener('click', () => {
+                    if (modalThirdOptionCallback) { modalThirdOptionCallback(); }
+                    closeModal();
+                });
+            }
+            // Close modal if overlay is clicked
+            if (domElements.customModal) {
+                domElements.customModal.addEventListener('click', (event) => {
+                    if (event.target === domElements.customModal) { // Clicked on overlay
+                        if (modalCancelCallback) { modalCancelCallback(); } // Treat as cancel, or specific "close by overlay" logic
+                        closeModal();
                     }
                 });
             }
@@ -1231,29 +1440,46 @@
         // --- Initialization ---
         window.addEventListener('load', async () => {
             console.log("Page loaded, starting initialization.");
+            // Suggested i18n keys (add to your language JSON files):
+            // i18nResources.modal_recommend_gemma_title = "Translation Quality Optimization";
+            // i18nResources.modal_recommend_gemma_message = "Translation is possible with your selected model ({selectedModel}), but for optimal quality, we recommend using the '{defaultModelName}' model. It's not currently installed. Download '{defaultModelName}' now?";
+            // i18nResources.modal_button_download_gemma = "Download {defaultModelName}";
+            // i18nResources.modal_button_proceed_anyway = "Proceed with Current Model";
+            // i18nResources.modal_button_cancel_recommendation = "Cancel"; // If you add a third button
+            // i18nResources.log_gemma_recommendation_shown = "Recommended model ({defaultModelName}) download prompt shown.";
+            // i18nResources.log_user_chose_to_download_gemma = "User chose to download the recommended model ({defaultModelName}).";
+            // i18nResources.log_user_proceeded_without_gemma = "User proceeded with the currently selected model ({selectedModel}) without downloading {defaultModelName}.";
+            // i18nResources.start_translation_button_retry = "Retry Translation";
+            // i18nResources.stopping_translation_button = "Stopping...";
+            // i18nResources.model_downloading_button = "Model Downloading...";
+            // i18nResources.status_default_model_missing_install_prompt = "Default model '{modelName}' is not found. Attempting to install...";
+            // i18nResources.status_model_pulling = "Downloading model {modelName}...";
+            // i18nResources.error_model_pull_start_failed = "Failed to start model download.";
+            // i18nResources.log_model_pull_starting = "Starting model download for {modelName}...";
+            // i18nResources.log_model_pull_error = "Error downloading model {modelName}: {details}";
+            // i18nResources.log_model_pull_success = "Model {modelName} downloaded successfully.";
+            // i18nResources.log_model_pull_error_connection = "Connection error while downloading model {modelName}.";
+            // i18nResources.log_model_pull_init_failed = "Failed to initialize model download for {modelName}: {message}";
+            // i18nResources.model_pull_status_downloading_details = "Downloading ({completedMB}MB / {totalMB}MB)";
+            // i18nResources.modal_new_task_title = "Confirm New Task";
+            // i18nResources.modal_new_task_message = "You haven't downloaded the translated file. Start a new task anyway?";
+            // i18nResources.modal_button_yes_proceed = "Yes, Start New";
+            // i18nResources.modal_button_no_cancel = "No, Cancel";
+            // i18nResources.log_user_confirmed_new_task = "User confirmed to proceed with a new task.";
+            // i18nResources.log_user_cancelled_new_task = "User cancelled proceeding with a new task.";
+
+            translatedFileAvailableButNotDownloaded = false; 
             const uiLanguageOptions = { "ko": "한국어", "en": "English", "ja": "日本語", "zh-CN": "简体中文", "zh-TW": "繁體中文", "th": "ไทย" };
             if(domElements.uiLanguageSelect) {
-                Object.entries(uiLanguageOptions).forEach(([code, name]) => {
-                    const option = document.createElement('option');
-                    option.value = code;
-                    option.textContent = name; // This will be overwritten by applyLocalization if a key exists
-                    domElements.uiLanguageSelect.appendChild(option);
-                });
+                Object.entries(uiLanguageOptions).forEach(([code, name]) => { const option = document.createElement('option'); option.value = code; option.textContent = name; domElements.uiLanguageSelect.appendChild(option); });
                 const savedLanguage = localStorage.getItem('uiLanguagePDT') || 'ko'; 
                 domElements.uiLanguageSelect.value = savedLanguage;
                 await loadAndSetLanguageResources(savedLanguage); 
-            } else { 
-                console.warn("UI language select dropdown not found. Defaulting to 'ko'.");
-                await loadAndSetLanguageResources('ko'); 
-            }
-            
+            } else { console.warn("UI language select dropdown not found. Defaulting to 'ko'."); await loadAndSetLanguageResources('ko'); }
             setupEventListeners(); 
-            
-            checkOllamaStatus(); 
+            await checkOllamaStatus(); 
             loadHistory();       
             resetFileInput();    
-            updateTranslateButtonState();
-
             console.log("Initialization complete.");
         });
     </script>

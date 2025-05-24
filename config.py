@@ -2,6 +2,7 @@
 import os
 import logging
 import platform
+import tempfile
 
 PROJECT_ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 APP_NAME_FOR_PATHS = "PowerpointDocumentTranslator"
@@ -17,6 +18,31 @@ UI_SUPPORTED_LANGUAGES = {
     "th": "ไทย"         # 태국어
 }
 DEFAULT_UI_LANGUAGE = "en"
+
+# UPLOAD_FOLDER 설정 추가 (tempfile과 APP_NAME_FOR_PATHS를 사용하여 경로 구성)
+# uploads 폴더를 앱 데이터 폴더 하위로 옮기거나, 기존처럼 temp 디렉토리 사용 가능
+# 여기서는 앱 데이터 폴더 하위에 두는 예시입니다.
+def get_app_data_dir_for_config(): # config.py 내에서 사용하기 위한 간단한 함수
+    system = platform.system()
+    if system == "Darwin":
+        return os.path.join(os.path.expanduser("~"), "Library", "Application Support", APP_NAME_FOR_PATHS)
+    elif system == "Windows":
+        return os.path.join(os.getenv("APPDATA"), APP_NAME_FOR_PATHS)
+    else: # Linux and other OS
+        return os.path.join(os.path.expanduser("~"), ".config", APP_NAME_FOR_PATHS)
+
+APP_DATA_DIR_CONFIG = get_app_data_dir_for_config()
+UPLOAD_FOLDER = os.path.join(APP_DATA_DIR_CONFIG, 'uploads') # 예: ~/.config/PowerpointDocumentTranslator/uploads
+
+# LOGS_DIR, HISTORY_DIR 등도 APP_DATA_DIR_CONFIG 기반으로 경로 일관성 확보 가능
+# 예시:
+# LOGS_DIR = os.path.join(APP_DATA_DIR_CONFIG, "logs" if platform.system() != "Darwin" else "Logs")
+# HISTORY_DIR = os.path.join(APP_DATA_DIR_CONFIG, "hist")
+
+# DEFAULT_OLLAMA_MODEL 설정 (이미 있다면 값 확인)
+DEFAULT_OLLAMA_MODEL = "gemma3:12b" # index.html에서 사용하는 기본 모델명과 일치
+
+ALLOWED_EXTENSIONS = {'pptx'}
 
 def get_app_data_dir():
     system = platform.system()
