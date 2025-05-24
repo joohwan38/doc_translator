@@ -44,6 +44,8 @@ DEFAULT_OLLAMA_MODEL = "gemma3:12b" # index.html에서 사용하는 기본 모�
 
 ALLOWED_EXTENSIONS = {'pptx'}
 
+MAX_TRANSLATION_CACHE_SIZE = 1000
+
 def get_app_data_dir():
     system = platform.system()
     if system == "Darwin":

@@ -13,6 +13,11 @@ import time
 import traceback
 from functools import wraps
 import logging # 로깅 모듈 추가
+import atexit
+from typing import Optional, Dict, Any, List, Tuple, Callable # Optional 및 다른 필요한 타입 힌트 추가
+
+
+from pptx import Presentation
 
 from apscheduler.schedulers.background import BackgroundScheduler
 
@@ -67,6 +72,15 @@ pptx_handler = PptxHandler()
 chart_processor = ChartXmlHandler(translator, ollama_service)
 ocr_handler_factory = OcrHandlerFactory()
 
+def cleanup_on_exit():
+    logger.info("애플리케이션 종료 시작... OCR 핸들러 정리 중.")
+    if ocr_handler_factory and hasattr(ocr_handler_factory, 'cleanup_handlers'):
+        ocr_handler_factory.cleanup_handlers()
+    logger.info("OCR 핸들러 정리 완료.")
+    # 다른 정리 작업이 있다면 여기에 추가
+
+atexit.register(cleanup_on_exit) # 종료 시 cleanup_on_exit 함수 실행 등록
+
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in config.ALLOWED_EXTENSIONS # config에서 ALLOWED_EXTENSIONS 사용
@@ -90,55 +104,109 @@ def error_handler(func):
             return jsonify({'error': localized_message, 'details': str(e) if app.debug else None}), 500
     return wrapper
 
-class TaskProgress: # 기존 TaskProgress 클래스 유지 또는 개선
+# web_app.py 에 포함된 TaskProgress 클래스
+class TaskProgress:
     def __init__(self, task_id, ui_language='ko'):
         self.task_id = task_id
         self.progress = 0
-        # status 초기화 시 language_resources 사용
         self.status = language_resources.get(ui_language, {}).get("status_preparing", "Preparing...")
         self.current_task = ""
-        self.queue = queue.Queue(maxsize=100) # SSE 메시지 큐
+        self.queue = queue.Queue(maxsize=200) # SSE 메시지 큐 (크기 조절 가능)
         self.completed = False
         self.output_file = None
         self.error = None
         self.total_estimated_work = 0
         self.current_completed_work = 0
-        self.current_ui_language = ui_language # UI 언어 저장
-        self.creation_time = time.time()
-        self.completion_time = None
+        self.current_ui_language = ui_language
+        self.creation_time = time.time() # float 타임스탬프
+        self.completion_time: Optional[float] = None # float 타임스탬프 또는 None
         self.original_filepath = None
-        self.log_filepath = None # 작업별 로그 파일 경로
+        self.log_filepath = None
         self.stop_event = threading.Event()
-        self.lock = threading.Lock()
+        self.lock = threading.Lock() # 진행률 업데이트 동기화용
 
-    def update_progress(self, location_key, task_type_key, weighted_work, text_snippet):
-        with self.lock:
-            if self.stop_event.is_set() and "stopping" not in self.status.lower() and \
-               language_resources.get(self.current_ui_language, {}).get("status_stopping", "Stopping...") not in self.status: # 다국어 비교
-                self.status = language_resources.get(self.current_ui_language, {}).get("status_stopping", "Stopping...")
-            else:
+    def update_progress(self, location_key: str, task_type_key: str, weighted_work: float, text_snippet: str):
+        with self.lock: # 스레드 안전하게 상태 업데이트
+            if self.completed: # 이미 완료된 작업은 업데이트하지 않음
+                return
+
+            # 중단 요청 시 상태 변경 (한 번만)
+            current_status_key_stopping = "status_stopping"
+            stopping_text = language_resources.get(self.current_ui_language, {}).get(current_status_key_stopping, "Stopping...")
+            if self.stop_event.is_set() and self.status != stopping_text :
+                self.status = stopping_text
+                self.current_task = language_resources.get(self.current_ui_language, {}).get("status_stopping_detail", "Stopping process...")[:50]
+            elif not self.stop_event.is_set(): # 중단 요청이 아닐 때만 일반 상태 업데이트
                 loc_text = language_resources.get(self.current_ui_language, {}).get(location_key, location_key)
                 task_text = language_resources.get(self.current_ui_language, {}).get(task_type_key, task_type_key)
                 self.status = f"{loc_text} - {task_text}"
-            
-            self.current_task = text_snippet[:50] if text_snippet else "" # 작업 중인 텍스트 조각
+                self.current_task = text_snippet[:50] if text_snippet else ""
+
             self.current_completed_work += weighted_work
             
             if self.total_estimated_work > 0:
-                self.progress = min(int((self.current_completed_work / self.total_estimated_work) * 100), 99) # 최대 99%로 제한, 완료 시 100%
+                # 진행률은 0과 99 사이로 유지 (100%는 작업 완료 시에만 설정)
+                self.progress = min(max(0, int((self.current_completed_work / self.total_estimated_work) * 100)), 99)
             
             update_data = {
                 'progress': self.progress, 'status': self.status, 'current_task': self.current_task,
                 'completed': self.completed, 'error': self.error
+                # download_url은 작업 완료 시점에 추가
             }
-            try:
-                self.queue.put_nowait(update_data)
-            except queue.Full:
-                try:
-                    self.queue.get_nowait() # 오래된 데이터 제거
-                    self.queue.put_nowait(update_data)
-                except queue.Empty: pass
+            self._put_to_queue(update_data)
 
+    def mark_as_final_status(self, final_status_key: str, error_message: Optional[str] = None, progress_val: Optional[int] = None):
+        """작업의 최종 상태(완료, 오류, 중지 등)를 설정하고 큐에 알립니다."""
+        with self.lock:
+            if self.completed and self.status == language_resources.get(self.current_ui_language, {}).get(final_status_key, final_status_key):
+                # 이미 동일한 최종 상태로 마크되었다면 중복 호출 방지 (선택적)
+                # logger.debug(f"Task {self.task_id} already marked as {final_status_key}.")
+                # return # 필요 시 활성화
+                pass
+
+
+            self.completed = True
+            self.completion_time = time.time()
+            self.status = language_resources.get(self.current_ui_language, {}).get(final_status_key, final_status_key)
+            if error_message:
+                self.error = str(error_message)[:200] # 오류 메시지 길이 제한
+            if progress_val is not None:
+                self.progress = min(max(0, progress_val), 100)
+            elif self.error: # 오류 시 진행률은 현재 값 유지 또는 0으로 설정
+                self.progress = min(self.progress, 99) # 오류 시 100% 안되도록
+            else: # 정상 완료
+                self.progress = 100
+
+            final_update_data = {
+                'progress': self.progress, 'status': self.status,
+                'completed': self.completed, 'error': self.error,
+                'current_task': self.current_task # 마지막 작업 내용 유지
+            }
+            if self.output_file and os.path.exists(self.output_file) and (not self.error or self.stop_event.is_set()):
+                final_update_data['download_url'] = f'/api/download/{self.task_id}'
+            
+            self._put_to_queue(final_update_data)
+            logger.info(f"Task {self.task_id} marked as final status: {self.status}, Progress: {self.progress}%, Error: {self.error}")
+
+            # 큐에 더 이상 넣을 데이터가 없음을 알리는 특별한 메시지 (선택적, SSE 스트림 종료용)
+            # self._put_to_queue({"_task_stream_end_": True})
+
+
+    def _put_to_queue(self, data: dict):
+        """SSE 큐에 데이터를 추가합니다. 큐가 가득 차면 가장 오래된 것을 제거합니다."""
+        try:
+            self.queue.put_nowait(data)
+        except queue.Full:
+            try:
+                self.queue.get_nowait() # 가장 오래된 데이터 제거
+                self.queue.put_nowait(data) # 새 데이터 추가
+                logger.warning(f"Task {self.task_id} progress queue was full. Oldest item discarded.")
+            except queue.Empty: # 거의 발생 안 함
+                pass
+            except Exception as e_put_retry:
+                 logger.error(f"Task {self.task_id} progress queue retry put failed: {e_put_retry}")
+        except Exception as e_put:
+            logger.error(f"Task {self.task_id} progress queue put failed: {e_put}")
 
 @app.route('/')
 def index_route(): # 함수 이름 변경 (index는 파이썬 예약어와 혼동 가능성)
@@ -250,131 +318,146 @@ def start_translation_route(): # 함수 이름 변경
 def translate_worker(task_id, filepath, src_lang, tgt_lang, model,
                     image_translation, ocr_temperature, ocr_use_gpu):
     task = tasks.get(task_id)
-    if not task: 
+    if not task:
         logger.error(f"Translate worker: Task {task_id} not found.")
         return
 
-    # 작업별 로그 파일 경로 설정
     task_log_filename = f"task_{task_id}_{datetime.now().strftime('%Y%m%d%H%M%S')}.log"
-    # config.LOGS_DIR 사용 (config.py에 정의되어 있어야 함)
-    if not hasattr(config, 'LOGS_DIR') or not config.LOGS_DIR:
-        # LOGS_DIR가 config에 없거나 비어있을 경우 임시 폴더 사용
-        task_log_dir = os.path.join(app.config['UPLOAD_FOLDER'], 'task_logs')
-        logger.warning(f"config.LOGS_DIR not defined, using temporary log directory: {task_log_dir}")
-    else:
-        task_log_dir = config.LOGS_DIR
-    os.makedirs(task_log_dir, exist_ok=True)
-    task.log_filepath = os.path.join(task_log_dir, task_log_filename)
+    log_dir_path = config.LOGS_DIR if hasattr(config, 'LOGS_DIR') and config.LOGS_DIR else os.path.join(app.config['UPLOAD_FOLDER'], 'task_logs')
     
+    # 로그 디렉토리 생성 시도
+    if not utils.ensure_directory_exists(log_dir_path):
+        task.mark_as_final_status("status_error_log_setup", f"Failed to create log directory: {log_dir_path}")
+        return # 로그 설정 실패 시 작업 중단
+
+    task.log_filepath = os.path.join(log_dir_path, task_log_filename)
+
     original_filename_base = os.path.splitext(os.path.basename(filepath))[0]
-    # 출력 파일명에 task_id 대신 좀 더 의미있는 정보나 타임스탬프 사용 고려 가능
     output_filename = f"{original_filename_base}_{tgt_lang}_translated_{task_id[:8]}.pptx"
-    output_path = os.path.join(app.config['UPLOAD_FOLDER'], output_filename) # app.config 사용
-    task.output_file = output_path
+    output_path = os.path.join(app.config['UPLOAD_FOLDER'], output_filename)
+    task.output_file = output_path # 초기 output_file 경로 설정
+
+    prs = None # Presentation 객체 참조
 
     try:
+        task.update_progress("status_key_file_info", "status_task_analyzing", 0, os.path.basename(filepath))
         file_info = pptx_handler.get_file_info(filepath)
-        if "error" not in file_info:
-            task.total_estimated_work = (
-                file_info.get("total_text_char_count", 0) * config.WEIGHT_TEXT_CHAR +
-                file_info.get("image_elements_count", 0) * config.WEIGHT_IMAGE +
-                file_info.get("chart_elements_count", 0) * config.WEIGHT_CHART)
-            if task.total_estimated_work == 0: task.total_estimated_work = 1 # 0으로 나누기 방지
-        else:
-            task.total_estimated_work = 1 # 정보 분석 실패 시 기본값
-            logger.warning(f"Could not get file_info for {filepath}, using default estimated work.")
+        if "error" in file_info or not isinstance(file_info, dict):
+            err_msg = file_info.get("error", "Unknown error during file analysis") if isinstance(file_info, dict) else "Invalid file_info format"
+            task.mark_as_final_status("status_error_file_analysis", err_msg)
+            return
 
+        task.total_estimated_work = (
+            file_info.get("total_text_char_count", 0) * config.WEIGHT_TEXT_CHAR +
+            file_info.get("image_elements_count", 0) * config.WEIGHT_IMAGE +
+            file_info.get("chart_elements_count", 0) * config.WEIGHT_CHART
+        )
+        if task.total_estimated_work <= 0: task.total_estimated_work = 1 # 0으로 나누기 방지
 
-        ocr_handler = None
+        ocr_handler_instance: Optional[AbsOcrHandler] = None # 타입 명시
         if image_translation:
-            # UI 언어 코드(예: "ko")를 OCR 핸들러 팩토리가 이해하는 코드 (예: "Korean")로 변환
             src_lang_name_for_ocr = config.TRANSLATION_LANGUAGES_MAP.get(src_lang, src_lang)
-            ocr_handler = ocr_handler_factory.get_ocr_handler(src_lang_name_for_ocr, ocr_use_gpu, debug_enabled=app.debug)
-            if not ocr_handler:
+            # get_ocr_handler 내부에서 캐싱/생성 처리
+            ocr_handler_instance = ocr_handler_factory.get_ocr_handler(
+                src_lang_name_for_ocr, ocr_use_gpu, debug_enabled=app.debug
+            )
+            if not ocr_handler_instance:
                 logger.warning(f"OCR Handler for {src_lang_name_for_ocr} (GPU: {ocr_use_gpu}) could not be initialized. Image translation will be skipped.")
-                # 사용자에게 알릴 방법 고려 (예: task.status 업데이트)
+                # 사용자에게 알림 (예: task.status 업데이트 또는 로그)
+                # task.update_progress("status_key_ocr_setup", "status_task_ocr_skip_no_handler", 0, "")
 
-        prs = Presentation(filepath)
-        # UI 언어 코드(예: "ko")를 번역기가 이해하는 언어 이름 (예: "Korean")으로 변환
+
+        prs = Presentation(filepath) # 여기서 Presentation 객체 로드
         src_lang_name = config.TRANSLATION_LANGUAGES_MAP.get(src_lang, src_lang)
         tgt_lang_name = config.TRANSLATION_LANGUAGES_MAP.get(tgt_lang, tgt_lang)
-        # 폰트 코드 결정 시 대상 언어의 UI 표시 이름 기준 (예: "한국어" -> "korean")
-        font_code_for_render = config.UI_LANG_TO_FONT_CODE_MAP.get(
-            # TRANSLATION_LANGUAGES_MAP의 value (영어 이름)를 UI_SUPPORTED_LANGUAGES의 value (UI 표시 이름)로 매칭
-            next((ui_name for code, ui_name in config.UI_SUPPORTED_LANGUAGES.items() if code == tgt_lang), tgt_lang),
-            'en' # 기본값 영어
-        )
+        
+        ui_tgt_lang_display_name = src_lang # 기본값
+        for code, name_map in config.TRANSLATION_LANGUAGES_MAP.items():
+            if code == tgt_lang: # tgt_lang은 'ko', 'en' 같은 코드
+                # 이 코드를 사용하는 UI 언어 이름을 찾아야 함 (예: 'ko' -> '한국어')
+                ui_tgt_lang_display_name = next((ui_name for ui_code, ui_name in config.UI_SUPPORTED_LANGUAGES.items() if ui_code == tgt_lang), tgt_lang)
+                break
+        
+        font_code_for_render = config.UI_LANG_TO_FONT_CODE_MAP.get(ui_tgt_lang_display_name, 'en')
 
 
+        task.update_progress("status_key_stage1_prep", "status_task_translating_text_images", 0, "")
         success_stage1 = pptx_handler.translate_presentation_stage1(
             prs, src_lang_name, tgt_lang_name,
-            translator, ocr_handler, model, ollama_service, font_code_for_render, task.log_filepath,
+            translator, ocr_handler_instance, model, ollama_service, font_code_for_render, task.log_filepath,
             task.update_progress, task.stop_event, image_translation, ocr_temperature
         )
 
         if task.stop_event.is_set():
-            task.status = language_resources.get(task.current_ui_language, {}).get("status_stopped_before_charts", "Stopped (before chart processing)")
+            task.mark_as_final_status("status_stopped_before_charts")
             # 중지 시에도 현재까지 작업된 파일 저장 시도
-            try: prs.save(output_path)
-            except Exception as e_save: logger.error(f"Error saving partially translated file on stop: {e_save}")
-            raise InterruptedError("Translation stopped by user during stage 1.")
+            try:
+                if prs: prs.save(output_path)
+                logger.info(f"Task {task_id} (stopped): Partially translated file saved to {output_path}")
+            except Exception as e_save:
+                logger.error(f"Task {task_id} (stopped): Error saving partially translated file: {e_save}")
+            return # 작업자 스레드 종료
 
         if not success_stage1:
-            # pptx_handler.translate_presentation_stage1 내부에서 오류 로깅 및 처리가 있을 것이므로 여기서는 일반적인 실패로 간주
-            raise Exception(language_resources.get(task.current_ui_language, {}).get("error_stage1_translation_failed", "Text/Image translation stage failed"))
+            task.mark_as_final_status("status_error_stage1_failed", language_resources.get(task.current_ui_language, {}).get("error_stage1_translation_failed_detail", "Text/Image translation stage failed internally."))
+            return
 
-        # 2단계: 차트 번역
-        # 임시 파일 저장 경로 (app.config['UPLOAD_FOLDER'] 사용)
+        task.update_progress("status_key_stage2_prep", "status_task_translating_charts", 0, "")
         temp_chart_input_path = os.path.join(app.config['UPLOAD_FOLDER'], f"temp_chart_input_{task_id}.pptx")
-        prs.save(temp_chart_input_path) # 차트 처리 전 중간 저장
+        
+        try:
+            if prs: prs.save(temp_chart_input_path)
+        except Exception as e_save_temp:
+            task.mark_as_final_status("status_error_saving_temp_chart_file", f"Failed to save temp file for chart processing: {e_save_temp}")
+            return
 
-        final_path = chart_processor.translate_charts_in_pptx(
+        final_path_from_chart_proc = chart_processor.translate_charts_in_pptx(
             temp_chart_input_path, src_lang_name, tgt_lang_name, model,
             output_path=output_path, # 최종 출력 경로 지정
             progress_callback_item_completed=task.update_progress,
             stop_event=task.stop_event,
             task_log_filepath=task.log_filepath
         )
-        
-        if os.path.exists(temp_chart_input_path): # 임시 파일 삭제
+
+        if os.path.exists(temp_chart_input_path):
             try: os.remove(temp_chart_input_path)
             except Exception as e_remove: logger.warning(f"Could not remove temporary chart input file {temp_chart_input_path}: {e_remove}")
 
         if task.stop_event.is_set():
-            task.status = language_resources.get(task.current_ui_language, {}).get("status_stopped_during_charts", "Stopped (during chart processing)")
-            # 차트 처리 중 중단 시 output_path에 저장된 파일이 최종 결과물이 될 수 있음 (일부 차트만 번역)
-            raise InterruptedError("Translation stopped by user during chart processing.")
+            task.mark_as_final_status("status_stopped_during_charts")
+            # output_path에 이미 일부 차트 번역된 파일이 저장되었을 수 있음
+            logger.info(f"Task {task_id} (stopped during charts): Output (if any) at {output_path}")
+            return
 
-        if final_path and os.path.exists(final_path):
-            task.output_file = final_path # 최종 파일 경로 업데이트
-            task.progress = 100
-            task.status = language_resources.get(task.current_ui_language, {}).get("status_completed", "Completed")
+        if final_path_from_chart_proc and os.path.exists(final_path_from_chart_proc):
+            task.output_file = final_path_from_chart_proc # 최종 파일 경로 업데이트 (실제 chart_processor가 반환한 경로)
+            task.mark_as_final_status("status_completed", progress_val=100)
         else:
-            raise Exception(language_resources.get(task.current_ui_language, {}).get("error_chart_translation_failed", "Chart translation failed or output file not created"))
+            task.mark_as_final_status("status_error_chart_failed", language_resources.get(task.current_ui_language, {}).get("error_chart_translation_failed_detail", "Chart translation failed or output file not created by chart processor."))
 
-    except InterruptedError:
-        logger.info(f"Task {task_id} was interrupted by user. Status: {task.status}")
+    except InterruptedError: # task.stop_event.is_set()으로 이미 처리되지만, 명시적 예외 처리
+        logger.info(f"Task {task_id} was explicitly interrupted. Status already set by stop_event check.")
+        # mark_as_final_status는 stop_event 체크 로직에서 호출되었을 것임
     except Exception as e:
         logger.error(f"Error in translate_worker (task {task_id}): {str(e)}", exc_info=True)
-        task.error = str(e) # 오류 메시지 저장
-        task.status = language_resources.get(task.current_ui_language, {}).get("status_error", "Error")
+        # 오류 발생 시에도 task.mark_as_final_status 호출
+        task.mark_as_final_status("status_error_worker_exception", f"Unhandled exception in worker: {str(e)}")
     finally:
-        task.completed = True
-        task.completion_time = time.time()
-        if task.stop_event.is_set() and "중지됨" not in task.status and "Stopped" not in task.status.capitalize(): # 다국어 고려
-             task.status = language_resources.get(task.current_ui_language, {}).get("status_stopped", "Stopped")
-
-        final_update_data = {'progress': min(task.progress, 100), 'status': task.status, 'completed': task.completed, 'error': task.error, 'current_task': task.current_task}
-        # 오류가 발생했더라도, 부분적으로라도 완료된 파일이 있고, 사용자가 중지한 경우 다운로드 URL 제공 가능
-        if task.output_file and os.path.exists(task.output_file) and (not task.error or task.stop_event.is_set()):
-            final_update_data['download_url'] = f'/api/download/{task_id}'
-        task.queue.put(final_update_data)
-
+        # prs 객체는 지역 변수이므로 스코프 벗어나면 자동으로 정리됨.
+        # 명시적인 파일 닫기 등은 Presentation 라이브러리 내부에서 처리.
+        
+        # 작업 완료/오류/중지 시 최종 상태를 한 번 더 큐에 넣어 SSE 스트림이 확실히 종료되도록 함.
+        # mark_as_final_status에서 이미 처리됨.
+        
+        # 번역 히스토리 저장 (task의 최종 status 사용)
+        # output_file이 None이거나 존재하지 않을 수 있으므로 체크
+        final_output_filename = os.path.basename(task.output_file) if task.output_file and os.path.exists(task.output_file) else ""
         save_translation_history(
             os.path.basename(filepath),
-            os.path.basename(task.output_file) if task.output_file else "",
-            src_lang, tgt_lang, model, task.status, task_id
+            final_output_filename,
+            src_lang, tgt_lang, model, task.status, task_id # task.status는 이미 번역된 텍스트일 수 있음. 키로 저장하려면 변경 필요.
         )
+        logger.info(f"Translate worker for task {task_id} finished. Final status: {task.status}")
 
 # --- 기존 APScheduler 및 나머지 라우트들 ---
 scheduler = BackgroundScheduler(daemon=True)
@@ -427,42 +510,100 @@ def cleanup_old_files_and_tasks():
 
 
 @app.route('/api/progress/<task_id>')
-def get_progress_route(task_id): # 함수 이름 변경
+def get_progress_route(task_id):
     task = tasks.get(task_id)
     if not task:
-        # 클라이언트 UI 언어에 맞춰 에러 메시지 반환 시도
         ui_lang_code = request.args.get('lang', config.DEFAULT_UI_LANGUAGE)
         error_msg = language_resources.get(ui_lang_code, {}).get("error_task_not_found", "Task not found.")
-        return jsonify({'error': error_msg}), 404
+        # 작업이 없을 경우, 클라이언트가 재시도하지 않도록 명확한 에러 또는 빈 스트림 후 종료.
+        # 여기서는 404 에러를 JSON으로 반환하는 것이 더 적절할 수 있음.
+        # return jsonify({'error': error_msg}), 404
+        # 또는 SSE 스트림으로 에러를 보내고 바로 닫기:
+        def empty_or_error_stream():
+            error_data = {'progress': 0, 'status': error_msg, 'completed': True, 'error': error_msg, 'current_task': ""}
+            yield f"data: {json.dumps(error_data)}\n\n"
+            logger.warning(f"SSE stream requested for non-existent task {task_id}.")
+        return Response(empty_or_error_stream(), mimetype='text/event-stream')
+
 
     def generate_sse_for_task():
-        # 초기 현재 상태 전송
-        initial_data = {'progress': task.progress, 'status': task.status, 'current_task': task.current_task, 'completed': task.completed, 'error': task.error}
-        if task.output_file and os.path.exists(task.output_file) and not task.error : initial_data['download_url'] = f'/api/download/{task_id}'
+        # 연결 시 현재까지의 상태 즉시 전송
+        with task.lock: # task 객체 상태 접근 시 락 사용
+            initial_data = {
+                'progress': task.progress, 'status': task.status,
+                'current_task': task.current_task, 'completed': task.completed,
+                'error': task.error
+            }
+            if task.output_file and os.path.exists(task.output_file) and (not task.error or task.stop_event.is_set()):
+                initial_data['download_url'] = f'/api/download/{task_id}'
+        
         yield f"data: {json.dumps(initial_data)}\n\n"
+        logger.debug(f"SSE stream for task {task_id}: Sent initial state.")
 
-        while not task.completed:
+        # 작업이 이미 완료된 상태로 시작될 수 있으므로 체크
+        if initial_data['completed']:
+            logger.info(f"SSE stream for task {task_id}: Task already completed. Closing stream.")
+            return # 스트림 바로 종료
+
+        while True: # task.completed 될 때까지 또는 예외 발생 시까지 루프
             try:
-                data = task.queue.get(timeout=1) # 큐에서 데이터 가져오기 (1초 타임아웃)
-                if task.output_file and os.path.exists(task.output_file) and not data.get('error'): # 성공적으로 파일 생성 시 다운로드 URL 추가
-                    data['download_url'] = f'/api/download/{task_id}'
-                yield f"data: {json.dumps(data)}\n\n"
-            except queue.Empty:
-                # 타임아웃 시 현재 상태 다시 보내거나 heartbeat 전송
-                current_heartbeat_data = {'progress': task.progress, 'status': task.status, 'current_task': task.current_task, 'completed': task.completed, 'error': task.error}
-                yield f"data: {json.dumps(current_heartbeat_data)}\n\n" # 현재 상태를 heartbeat처럼 사용
+                # 큐에서 새 진행률 데이터 가져오기 (타임아웃 설정)
+                # 타임아웃을 짧게 (예: 1초) 하여 stop_event나 task.completed를 더 자주 체크
+                data_from_queue = task.queue.get(timeout=1.0) # 1초 타임아웃
+
+                # "_task_stream_end_" 같은 특별한 메시지로 스트림 종료 신호 처리 (선택적)
+                # if isinstance(data_from_queue, dict) and data_from_queue.get("_task_stream_end_"):
+                #    logger.info(f"SSE stream for task {task_id}: Received explicit end signal. Closing stream.")
+                #    break
+                
+                # 클라이언트에 데이터 전송
+                yield f"data: {json.dumps(data_from_queue)}\n\n"
+
+                # 받은 데이터가 최종 완료 상태를 나타내면 루프 종료
+                if data_from_queue.get('completed'):
+                    logger.info(f"SSE stream for task {task_id}: Received 'completed' in data. Closing stream.")
+                    break
+            
+            except queue.Empty: # 타임아웃 (큐에 새 데이터 없음)
+                # 작업이 실제로 완료되었는지, 또는 중단되었는지 다시 확인
+                with task.lock:
+                    is_task_really_done = task.completed
+                    current_progress_on_timeout = task.progress
+                    current_status_on_timeout = task.status
+                    current_task_on_timeout = task.current_task
+                    current_error_on_timeout = task.error
+
+                if is_task_really_done:
+                    logger.info(f"SSE stream for task {task_id}: Task confirmed completed during queue timeout. Closing stream.")
+                    # 마지막 상태 한 번 더 보내고 종료 (선택적, mark_as_final_status에서 이미 보냈을 수 있음)
+                    final_heartbeat_data = {
+                        'progress': current_progress_on_timeout, 'status': current_status_on_timeout,
+                        'completed': True, 'error': current_error_on_timeout,
+                        'current_task': current_task_on_timeout
+                    }
+                    if task.output_file and os.path.exists(task.output_file) and (not current_error_on_timeout or task.stop_event.is_set()):
+                        final_heartbeat_data['download_url'] = f'/api/download/{task_id}'
+                    yield f"data: {json.dumps(final_heartbeat_data)}\n\n"
+                    break
+                else:
+                    # 아직 작업 진행 중, heartbeat 역할 (또는 현재 상태 다시 전송)
+                    heartbeat_data = {
+                        'progress': current_progress_on_timeout, 'status': current_status_on_timeout,
+                        'completed': False, 'error': current_error_on_timeout,
+                        'current_task': current_task_on_timeout
+                    }
+                    yield f"data: {json.dumps(heartbeat_data)}\n\n" # 현재 상태를 heartbeat처럼 사용
+            
+            except GeneratorExit: # 클라이언트가 연결을 끊은 경우
+                logger.info(f"SSE client for task {task_id} disconnected (GeneratorExit). Stream closing.")
+                break
             except Exception as e:
                 logger.error(f"Error during SSE generation for task {task_id}: {e}", exc_info=True)
-                error_stream_data = {'progress': task.progress, 'status': "SSE Error", 'completed': True, 'error': str(e)}
+                error_stream_data = {'progress': task.progress, 'status': "SSE Stream Error", 'completed': True, 'error': str(e), 'current_task': task.current_task}
                 yield f"data: {json.dumps(error_stream_data)}\n\n"
                 break
         
-        # 작업 완료 후 최종 상태 한 번 더 전송
-        final_data = {'progress': min(task.progress,100), 'status': task.status, 'completed': task.completed, 'error': task.error, 'current_task': task.current_task}
-        if task.output_file and os.path.exists(task.output_file) and (not task.error or task.stop_event.is_set()):
-            final_data['download_url'] = f'/api/download/{task_id}'
-        yield f"data: {json.dumps(final_data)}\n\n"
-        logger.info(f"SSE stream for task {task_id} ended.")
+        logger.info(f"SSE stream for task {task_id} officially ended.")
 
     return Response(generate_sse_for_task(), mimetype='text/event-stream')
 
@@ -641,14 +782,16 @@ if __name__ == '__main__':
 
     # 스케줄러 설정 및 시작
     cleanup_hour = app.config.get('CLEANUP_HOUR', 3)
-    if not scheduler.running: # 스케줄러가 이미 실행 중이지 않을 때만 추가 및 시작
+    if not scheduler.running:
         scheduler.add_job(cleanup_old_files_and_tasks, 'cron', hour=cleanup_hour, minute=0, id="cleanup_job", replace_existing=True)
         try:
             scheduler.start()
             logger.info(f"File and task cleanup scheduler started (runs daily at {cleanup_hour:02}:00).")
-        except Exception as e:
-            logger.error(f"Failed to start scheduler: {e}")
+        except Exception as e: # 이미 실행 중일 때 발생하는 예외 등 처리
+            if "conflicting job" in str(e).lower() or "already running" in str(e).lower():
+                 logger.warning(f"Scheduler job 'cleanup_job' already exists or scheduler already running. Details: {e}")
+            else:
+                logger.error(f"Failed to start scheduler: {e}")
 
 
-    # Flask 앱 실행 (디버그 모드는 개발 시에만 True)
     app.run(debug=app.config.get('DEBUG', False), host=app.config.get('HOST', '0.0.0.0'), port=app.config.get('PORT', 5001))
