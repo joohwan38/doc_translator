@@ -8,7 +8,7 @@ import psutil
 import time
 import logging
 import json
-from typing import Tuple, Optional, List, Callable, Any, Generator
+from typing import Tuple, Optional, List, Callable, Any, Generator, Dict
 import threading
 import queue
 
