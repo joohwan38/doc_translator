@@ -139,5 +139,22 @@
     "error_invalid_file_type": "잘못된 파일 형식입니다.",
     "status_completed": "완료",
     "log_action_on_error_state": "오류 상태에서 작업 재설정 시도.",
-    "log_download_initiated": "{taskId} 작업 파일 다운로드 시작됨."
+    "log_download_initiated": "{taskId} 작업 파일 다운로드 시작됨.",
+    "status_key_stage1_prep": "1단계 준비 중",
+    "status_task_translating_text_images": "텍스트 및 이미지 번역 중",
+    "ocr_status_detection_complete": "이미지 텍스트 검출 완료",
+    "ocr_status_detection_no_text": "이미지 분석 (텍스트 없음)",
+    "ocr_status_translating_texts": "이미지 내 텍스트 번역 진행 중", 
+    "ocr_status_translating_texts_complete": "이미지 내 텍스트 번역 완료",
+    "ocr_status_rendering_text": "이미지 내 텍스트 렌더링 중",
+    "ocr_status_rendering_complete_no_text": "이미지 렌더링 (내용 없음)",
+    "ocr_status_processing_complete_no_translation_needed": "이미지 처리 완료 (번역 대상 없음)",
+    "ocr_status_processing_error": "이미지 처리 오류",
+    "status_applying_text_shape": "텍스트 도형 번역 적용 중",
+    "status_applying_table_cell": "표 셀 번역 적용 중",
+    "error_table_cell_access": "표 셀 접근 실패",
+    "chart_status_text_collection_complete": "차트 텍스트 수집 완료",
+    "chart_status_batch_translation_complete": "차트 텍스트 일괄 번역 완료",
+    "chart_status_applying_translation": "차트 번역 적용 중",
+    "status_stopping": "중지 중..."
 }
