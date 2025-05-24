@@ -774,10 +774,11 @@ def get_ui_languages_route():
 
 if __name__ == '__main__':
     # Flask 앱 실행 전 필요한 디렉토리 생성 확인
-    os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-    if hasattr(config, 'LOGS_DIR') and config.LOGS_DIR: os.makedirs(config.LOGS_DIR, exist_ok=True)
-    else: os.makedirs(os.path.join(app.config['UPLOAD_FOLDER'], 'task_logs'), exist_ok=True) # 임시 로그 폴더
-    if hasattr(config, 'HISTORY_DIR') and config.HISTORY_DIR: os.makedirs(config.HISTORY_DIR, exist_ok=True)
+    # os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+    # if hasattr(config, 'LOGS_DIR') and config.LOGS_DIR: os.makedirs(config.LOGS_DIR, exist_ok=True)
+    # else: os.makedirs(os.path.join(app.config['UPLOAD_FOLDER'], 'task_logs'), exist_ok=True) # 임시 로그 폴더
+    # if hasattr(config, 'HISTORY_DIR') and config.HISTORY_DIR: os.makedirs(config.HISTORY_DIR, exist_ok=True)
+    flask_port = int(os.environ.get('FLASK_PORT', 5001)) # Electron에서 설정한 포트 사용
 
 
     # 스케줄러 설정 및 시작
@@ -793,5 +794,5 @@ if __name__ == '__main__':
             else:
                 logger.error(f"Failed to start scheduler: {e}")
 
-
-    app.run(debug=app.config.get('DEBUG', False), host=app.config.get('HOST', '0.0.0.0'), port=app.config.get('PORT', 5001))
+    print(f"Flask server starting on port: {flask_port}")
+    app.run(debug=app.config.get('DEBUG', False), host='127.0.0.1', port=flask_port) # 호스트를 127.0.0.1로 명시

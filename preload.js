@@ -1,0 +1,7 @@
+const { contextBridge, ipcRenderer } = require('electron');
+
+contextBridge.exposeInMainWorld('electronAPI', {
+    getFlaskPort: () => ipcRenderer.invoke('get-flask-port'),
+    openLogFolder: () => ipcRenderer.invoke('open-log-folder'),
+    deleteTranslationHistory: () => ipcRenderer.invoke('delete-translation-history')
+});

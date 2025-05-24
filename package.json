@@ -1,0 +1,65 @@
+{
+    "name": "powerpoint-document-translator",
+    "version": "0.1.0",
+    "description": "PowerPoint Document Translator using Ollama and Electron",
+    "main": "main.js",
+    "scripts": {
+        "start": "electron .",
+        "dist": "electron-builder"
+    },
+    "keywords": [
+        "Electron",
+        "Python",
+        "Flask",
+        "Ollama",
+        "Translation"
+    ],
+    "author": "joohwan.son",
+    "private": true,
+    "license": "UNLICENSED",
+    "dependencies": {
+        "find-free-port": "^2.0.0"
+    },
+    "devDependencies": {
+        "electron": "^29.0.0",
+        "electron-builder": "^24.9.1"
+    },
+    "build": {
+        "appId": "com.yourcompany.powerpointtranslator",
+        "productName": "PowerPoint Document Translator",
+        "files": [
+            "main.js",
+            "preload.js",
+            "index.html",
+            "*.py",
+            "assets/**/*",
+            "locales/**/*",
+            "static/**/*",
+            "!node_modules/**/*",
+            "!*.md"
+        ],
+        "mac": {
+            "target": "dmg",
+            "icon": "assets/app_icon.icns"
+        },
+        "win": {
+            "target": "nsis",
+            "icon": "assets/app_icon.ico"
+        },
+        "linux": {
+            "target": "AppImage",
+            "icon": "assets/app_icon.png"
+        },
+        "directories": {
+            "buildResources": "assets"
+        }
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/joohwan38/doc_translator.git"
+    },
+    "bugs": {
+        "url": "https://github.com/joohwan38/doc_translator/issues"
+    },
+    "homepage": "https://github.com/joohwan38/doc_translator#readme"
+}
