@@ -15,7 +15,8 @@ from functools import wraps
 import logging # 로깅 모듈 추가
 import atexit
 from typing import Optional, Dict, Any, List, Tuple, Callable # Optional 및 다른 필요한 타입 힌트 추가
-
+import sys
+from interfaces import AbsOcrHandler
 
 from pptx import Presentation
 
@@ -33,8 +34,8 @@ import utils # 유틸리티 모듈 import (open_folder 등)
 # --- 로거 설정 ---
 # logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__) # Flask 기본 로거 사용 또는 위 주석 해제 후 커스텀
+app = Flask(__name__, template_folder='templates', static_folder='static')
 
-app = Flask(__name__)
 CORS(app)
 
 # --- 설정 로드 및 UPLOAD_FOLDER 설정 ---
@@ -773,26 +774,35 @@ def get_ui_languages_route():
 
 
 if __name__ == '__main__':
-    # Flask 앱 실행 전 필요한 디렉토리 생성 확인
-    # os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-    # if hasattr(config, 'LOGS_DIR') and config.LOGS_DIR: os.makedirs(config.LOGS_DIR, exist_ok=True)
-    # else: os.makedirs(os.path.join(app.config['UPLOAD_FOLDER'], 'task_logs'), exist_ok=True) # 임시 로그 폴더
-    # if hasattr(config, 'HISTORY_DIR') and config.HISTORY_DIR: os.makedirs(config.HISTORY_DIR, exist_ok=True)
-    flask_port = int(os.environ.get('FLASK_PORT', 5001)) # Electron에서 설정한 포트 사용
+    flask_port_to_use = 5002 # 기본 포트, main.js에서 환경변수로 설정한 값을 우선 사용
+    try:
+        # FLASK_PORT 환경 변수가 main.js에서 설정된 경우 해당 포트 사용
+        port_str = os.environ.get('FLASK_PORT', str(flask_port_to_use))
+        flask_port_to_use = int(port_str)
+        print(f"--- Flask app trying to run on host 127.0.0.1, port {flask_port_to_use} ---", flush=True)
+        sys.stdout.flush() # 강제 플러시
 
+        # 스케줄러 설정 및 시작 (app.run 호출 전으로 이동)
+        cleanup_hour = app.config.get('CLEANUP_HOUR', 3)
+        if not scheduler.running:
+            scheduler.add_job(cleanup_old_files_and_tasks, 'cron', hour=cleanup_hour, minute=0, id="cleanup_job", replace_existing=True)
+            try:
+                scheduler.start()
+                logger.info(f"File and task cleanup scheduler started (runs daily at {cleanup_hour:02}:00).")
+            except Exception as e_scheduler: # 스케줄러 시작 오류 처리
+                if "conflicting job" in str(e_scheduler).lower() or "already running" in str(e_scheduler).lower():
+                     logger.warning(f"Scheduler job 'cleanup_job' already exists or scheduler already running. Details: {e_scheduler}")
+                else:
+                    logger.error(f"Failed to start scheduler: {e_scheduler}")
+        
+        app.run(debug=app.config.get('DEBUG', False), host='127.0.0.1', port=flask_port_to_use)
 
-    # 스케줄러 설정 및 시작
-    cleanup_hour = app.config.get('CLEANUP_HOUR', 3)
-    if not scheduler.running:
-        scheduler.add_job(cleanup_old_files_and_tasks, 'cron', hour=cleanup_hour, minute=0, id="cleanup_job", replace_existing=True)
-        try:
-            scheduler.start()
-            logger.info(f"File and task cleanup scheduler started (runs daily at {cleanup_hour:02}:00).")
-        except Exception as e: # 이미 실행 중일 때 발생하는 예외 등 처리
-            if "conflicting job" in str(e).lower() or "already running" in str(e).lower():
-                 logger.warning(f"Scheduler job 'cleanup_job' already exists or scheduler already running. Details: {e}")
-            else:
-                logger.error(f"Failed to start scheduler: {e}")
+    except ValueError: # int(port_str) 변환 실패 시
+        print(f"--- CRITICAL ERROR: Invalid FLASK_PORT value '{port_str}'. Using default {flask_port_to_use} if possible or failing. ---", flush=True)
+        sys.stdout.flush()
 
-    print(f"Flask server starting on port: {flask_port}")
-    app.run(debug=app.config.get('DEBUG', False), host='127.0.0.1', port=flask_port) # 호스트를 127.0.0.1로 명시
+    except Exception as e:
+        print(f"--- CRITICAL ERROR in web_app.py __main__: {e} ---", flush=True)
+        traceback.print_exc()
+        sys.stdout.flush()
+

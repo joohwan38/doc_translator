@@ -1,10 +1,11 @@
 {
-    "name": "powerpoint-document-translator",
+    "name": "document-translator",
     "version": "1.5.0",
     "description": "PowerPoint Document Translator using Ollama and Electron",
     "main": "main.js",
     "scripts": {
         "start": "electron .",
+        "dist:mac": "electron-builder --mac",
         "dist": "electron-builder"
     },
     "keywords": [
@@ -26,25 +27,30 @@
     },
     "build": {
         "appId": "com.yourcompany.powerpointtranslator",
-        "productName": "PowerPoint Document Translator",
-        "hardenedRuntime": true,
-        "gatekeeperAssess": false,
+        "productName": "Document Translator",
         "asar": true,
         "files": [
             "main.js",
             "preload.js",
-            "*.py",
-            "templates/",
             "assets/**/*",
-            "locales/**/*",
-            "static/**/*",
-            "!node_modules/**/*",
             "!*.md"
         ],
+        "extraResources": [
+        {
+          "from": "./python_runtime/", 
+          "to": "python_runtime",    
+          "filter": ["**/*"]
+        },      { 
+        "from": "./python_backend/", 
+        "to": "python_backend", 
+        "filter": ["**/*"]
+      }],
         "mac": {
             "category": "public.app-category.utilities",
             "target": "dmg",
-            "icon": "assets/app_icon.icns"
+            "icon": "assets/app_icon.icns",
+            "gatekeeperAssess": false,
+            "hardenedRuntime": false
         },
         "win": {
             "target": "nsis",

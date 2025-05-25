@@ -6,6 +6,7 @@ dist/
 wheels/
 files/
 temp/
+release/
 python_runtime/
 python_deps/
 node_modules/

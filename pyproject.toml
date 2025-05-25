@@ -9,9 +9,12 @@ dependencies = [
     "apscheduler>=3.11.0",
     "flask>=3.1.1",
     "flask-cors>=6.0.0",
+    "paddleocr==2.9.0",
+    "paddlepaddle==3.0.0",
     "pillow>=11.2.1",
     "psutil>=7.0.0",
     "python-pptx>=1.0.2",
+    "requests>=2.32.3",
     "setuptools>=80.8.0",
     "wheel>=0.45.1",
 ]

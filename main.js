@@ -84,14 +84,14 @@ async function initializeAppPaths() {
 function createWindow() {
     console.log(`[TIME] createWindow - Start: ${performance.now().toFixed(2)}`);
     mainWindow = new BrowserWindow({
-        width: 1280,
-        height: 800,
+        width: 1100,
+        height:1100,
         webPreferences: {
             preload: path.join(__dirname, 'preload.js'), //
             contextIsolation: true,
             nodeIntegration: false,
         },
-        icon: path.join(__dirname, 'static', 'LINEstudio2.png') // 아이콘 경로 확인
+        icon: path.join(__dirname, 'assets', 'app_icon.icns')
     });
     console.log(`[TIME] createWindow - BrowserWindow object created: ${performance.now().toFixed(2)}`);
 
@@ -129,31 +129,50 @@ function startPythonServer() {
                 console.log(`[TIME] startPythonServer - Port ${flaskPort} found: ${performance.now().toFixed(2)}`);
                 console.log(`[PythonServer] Flask server will run on port: ${flaskPort}`);
 
-                // ... (pythonExecutable, scriptPath, pythonEnv 설정은 이전과 동일) ...
                 let pythonExecutable = process.platform === 'win32' ? 'python' : 'python3';
-                const bundledPythonPath = process.platform === 'win32'
-                    ? path.join(process.resourcesPath, 'python_runtime', 'python.exe')
-                    : path.join(process.resourcesPath, 'python_runtime', 'bin', 'python3');
+                
+                // 패키징된 앱과 개발 환경에 따라 Python 실행 파일 및 스크립트 경로, 작업 디렉토리 설정
+                const baseDir = app.isPackaged ? process.resourcesPath : __dirname;
+                const scriptPath = path.join(baseDir, 'python_backend', 'web_app.py');
+                const pythonCwd = path.join(baseDir, 'python_backend');
 
-                if (app.isPackaged && fs.existsSync(bundledPythonPath)) {
-                    pythonExecutable = bundledPythonPath;
-                    console.log(`[PythonServer] Using bundled Python: ${pythonExecutable}`);
-                } else if (app.isPackaged) {
-                    console.warn(`[PythonServer] Bundled Python not found at ${bundledPythonPath}. Falling back to system Python.`);
+                if (app.isPackaged) {
+                    const pythonVersionFolder = '3.12'; // 사용자가 명시한 버전 폴더명
+                    let bundledPythonPath;
+                    if (process.platform === 'win32') {
+                        bundledPythonPath = path.join(baseDir, 'python_runtime', pythonVersionFolder, 'python.exe');
+                    } else { // macOS, Linux
+                        bundledPythonPath = path.join(baseDir, 'python_runtime', pythonVersionFolder, 'bin', 'python3.12');
+                    }
+                    
+                    console.log(`[PythonServer] Packaged app: Attempting to use bundled Python at: ${bundledPythonPath}`);
+                    if (fs.existsSync(bundledPythonPath)) {
+                        pythonExecutable = bundledPythonPath;
+                        console.log(`[PythonServer] Using bundled Python: ${pythonExecutable}`);
+                    } else {
+                        console.error(`[PythonServer] CRITICAL: Bundled Python not found at ${bundledPythonPath}. Falling back to system Python.`);
+                        dialog.showErrorBox("Fatal Error", `Bundled Python not found. The application might not work correctly.\nExpected at: ${bundledPythonPath}`);
+                    }
+                } else {
+                    console.log(`[PythonServer] Development mode: Using system Python: ${pythonExecutable}`);
                 }
-                const scriptPath = path.join(__dirname, 'web_app.py');
+
                 const pythonEnv = {
                     ...process.env,
                     FLASK_PORT: flaskPort.toString(),
                     PYTHONUNBUFFERED: "1",
-                    POWERPOINT_TRANSLATOR_APP_DATA_DIR: APP_DATA_DIR_CONFIG,
+                    POWERPOINT_TRANSLATOR_APP_DATA_DIR: APP_DATA_DIR_CONFIG, // 이 값들은 외부 경로이므로 유지
                     POWERPOINT_TRANSLATOR_LOGS_DIR: LOGS_DIR,
                     POWERPOINT_TRANSLATOR_HISTORY_DIR: HISTORY_DIR
                 };
-                // --- 설정 부분 끝 ---
 
                 console.log(`[TIME] startPythonServer - Before spawn: ${performance.now().toFixed(2)}`);
-                pythonProcess = spawn(pythonExecutable, [scriptPath], { stdio: 'pipe', env: pythonEnv, cwd: __dirname });
+                console.log(`[PythonServer] Executing: ${pythonExecutable}`);
+                console.log(`[PythonServer] Script: ${scriptPath}`);
+                console.log(`[PythonServer] CWD: ${pythonCwd}`); // 작업 디렉토리 명시
+
+                // Python 프로세스 실행 시 CWD (Current Working Directory) 설정
+                pythonProcess = spawn(pythonExecutable, [scriptPath], { stdio: 'pipe', env: pythonEnv, cwd: pythonCwd });
                 console.log(`[TIME] startPythonServer - After spawn: ${performance.now().toFixed(2)}`);
 
                 let outputBuffer = ''; // stdout과 stderr 데이터를 공통으로 누적하거나, 별도 버퍼 사용 가능
@@ -168,15 +187,6 @@ function startPythonServer() {
                     if (trimmedChunk) {
                         console.log(`[Python ${dataSourceName} (Trimmed Chunk)]: ${trimmedChunk}`);
                     }
-                    
-                    // --- 디버깅 로그 (필요시 활성화) ---
-                    // console.log(`[DEBUG ${dataSourceName}] --- Checking condition with regex ---`);
-                    // const bufferLogSnippet = outputBuffer.length > 300 ? `...${outputBuffer.slice(-300)}` : outputBuffer;
-                    // console.log(`[DEBUG ${dataSourceName}] outputBuffer (last 300 chars or full): "${bufferLogSnippet.replace(/\n/g, "\\n")}"`);
-                    // const patternTestResult = readyPattern.test(outputBuffer);
-                    // console.log(`[DEBUG ${dataSourceName}] readyPattern.test(outputBuffer)?: ${patternTestResult}`);
-                    // console.log(`[DEBUG ${dataSourceName}] --- End of condition check ---`);
-                    // --- 디버깅 로그 끝 ---
 
                     if (!resolveInvoked && readyPattern.test(outputBuffer)) {
                         resolveInvoked = true;
@@ -230,8 +240,12 @@ function startPythonServer() {
                         resolveInvoked = true;
                         console.warn(`[PythonServer] Flask server startup timed out after 20s (Port: ${flaskPort}). Proceeding.`);
                         console.log(`[TIME] startPythonServer - Timeout occurred: ${performance.now().toFixed(2)}`);
-                        pythonProcess.stdout.removeListener('data', onStdoutData);
-                        pythonProcess.stderr.removeListener('data', onStderrData);
+                        
+                        // pythonProcess가 null이 아닐 때만 리스너를 제거하도록 수정
+                        if (pythonProcess) {
+                            pythonProcess.stdout.removeListener('data', onStdoutData);
+                            pythonProcess.stderr.removeListener('data', onStderrData);
+                        }
                         resolve(flaskPort);
                     }
                 }, 20000);
