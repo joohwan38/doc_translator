@@ -371,19 +371,16 @@ class PptxHandler(AbsPptxProcessor):
         for prop_name in tf_props_to_backup:
             try:
                 original_tf_properties[prop_name] = getattr(text_frame_obj, prop_name, None)
-            except AttributeError: # Some properties might not exist (e.g., on table cell text_frame)
+            except AttributeError:
                 original_tf_properties[prop_name] = None
                 logger.debug(f"Attribute '{prop_name}' not found on text_frame for '{item_name_for_log}'.")
 
-
         # 2. Prepare text frame for new content
         try:
-            # Disable auto_size temporarily to prevent issues with text fitting during modification
             if original_tf_properties.get('auto_size') is not None and \
                original_tf_properties['auto_size'] != MSO_AUTO_SIZE.NONE:
                 text_frame_obj.auto_size = MSO_AUTO_SIZE.NONE
-            # Ensure word_wrap is enabled for multi-language text flow
-            if original_tf_properties.get('word_wrap') is False : # Only set if it was False
+            if original_tf_properties.get('word_wrap') is False :
                  text_frame_obj.word_wrap = True
         except Exception as e_prop_set:
             logger.debug(f"Error setting temporary text_frame properties for '{item_name_for_log}': {e_prop_set}")
@@ -397,9 +394,8 @@ class PptxHandler(AbsPptxProcessor):
                 if log_func: log_func(f"      Translated text for '{item_name_for_log}' is empty. Adding a single space paragraph.")
                 p_new = text_frame_obj.add_paragraph()
                 run_new = p_new.add_run()
-                run_new.text = " " # Add a space to maintain the paragraph structure
+                run_new.text = " " 
 
-                # Apply style from the first original paragraph, if available
                 if original_para_styles_list:
                     first_para_style_info = original_para_styles_list[0]
                     self._apply_paragraph_style(p_new, first_para_style_info)
@@ -407,28 +403,44 @@ class PptxHandler(AbsPptxProcessor):
                         self._apply_text_style(run_new, first_para_style_info['runs'][0].get('style', {}))
                     elif first_para_style_info.get('paragraph_default_run_style'):
                          self._apply_text_style(run_new, first_para_style_info['paragraph_default_run_style'])
-
             else: # If there is translated text content
                 lines = translated_text.splitlines()
                 if not lines and translated_text: # Handle case where splitlines is empty but text exists (single line no newline)
                     lines = [translated_text]
                 
-                for i, line_text in enumerate(lines):
-                    p_new = text_frame_obj.add_paragraph()
-                    current_line_text = line_text if line_text.strip() else " " # Use space for blank lines
+                # --- 수정된 로직 시작 ---
+                is_leading_newline_artifact = False
+                # 첫 번째 줄이 비어있고 (공백만 있는 경우 포함), 그 뒤에 실제 내용이 있는 다른 줄이 있는지 확인
+                if len(lines) > 0 and not lines[0].strip() and \
+                   any(line.strip() for line in lines[1:]):
+                    is_leading_newline_artifact = True
+                    if log_func: log_func(f"      Detected and will skip artifact leading empty line for '{item_name_for_log}'.")
 
-                    # Determine which original paragraph's style to use as a template
-                    # Uses style of original paragraph at same index, or last available style if new text has more lines
-                    style_template_index = min(i, len(original_para_styles_list) - 1) if original_para_styles_list else -1
+                paragraphs_added_count = 0
+                for i, line_text in enumerate(lines):
+                    if is_leading_newline_artifact and i == 0:
+                        # 번역기 결과물 앞쪽에 불필요하게 추가된 줄바꿈으로 인해 생긴 빈 줄이라면 건너뜀
+                        continue
+
+                    p_new = text_frame_obj.add_paragraph()
+                    paragraphs_added_count += 1
+                    current_line_text = line_text if line_text.strip() else " " 
+
+                    # 스타일 적용 시, 건너뛴 빈 줄이 있다면 스타일 인덱스 보정
+                    style_application_line_index = i - (1 if is_leading_newline_artifact else 0)
+                    
+                    style_template_index = -1
+                    if original_para_styles_list and style_application_line_index >= 0: # 음수 인덱스 방지
+                        style_template_index = min(style_application_line_index, len(original_para_styles_list) - 1)
                     
                     para_style_to_apply = {}
                     run_style_to_apply = {}
 
                     if style_template_index != -1:
                         para_style_info = original_para_styles_list[style_template_index]
-                        para_style_to_apply = para_style_info # For paragraph level attributes
-                        # For run style, use the first run's style from the template paragraph, or paragraph default
+                        para_style_to_apply = para_style_info 
                         if para_style_info.get('runs') and para_style_info['runs']:
+                            # 첫 번째 run의 스타일을 해당 단락의 기본 스타일로 사용
                             run_style_to_apply = para_style_info['runs'][0].get('style', {})
                         elif para_style_info.get('paragraph_default_run_style'):
                             run_style_to_apply = para_style_info['paragraph_default_run_style']
@@ -437,24 +449,41 @@ class PptxHandler(AbsPptxProcessor):
                     run_new = p_new.add_run()
                     run_new.text = current_line_text
                     self._apply_text_style(run_new, run_style_to_apply)
+                
+                # 만약 모든 줄이 건너뛰어졌거나 (예: translated_text="\n" 이고 artifact로 처리되어)
+                # 실제 내용이 있었음에도 단락이 하나도 추가되지 않았다면, 기본 단락 하나를 추가
+                if paragraphs_added_count == 0 and translated_text.strip():
+                    if log_func: log_func(f"      All lines were skipped or empty for '{item_name_for_log}' but original translation had content. Adding default paragraph.")
+                    p_new = text_frame_obj.add_paragraph()
+                    run_new = p_new.add_run()
+                    run_new.text = translated_text.strip() # 최소한의 내용이라도 표시
 
-                if log_func: log_func(f"      Applied translated text ({len(lines)} lines) to '{item_name_for_log}'.")
+                    # 첫번째 스타일이라도 적용 시도
+                    if original_para_styles_list:
+                        first_para_style_info = original_para_styles_list[0]
+                        self._apply_paragraph_style(p_new, first_para_style_info)
+                        if first_para_style_info.get('runs') and first_para_style_info['runs']:
+                             self._apply_text_style(run_new, first_para_style_info['runs'][0].get('style', {}))
+                        elif first_para_style_info.get('paragraph_default_run_style'):
+                             self._apply_text_style(run_new, first_para_style_info['paragraph_default_run_style'])
+                # --- 수정된 로직 끝 ---
+
+                if log_func: log_func(f"      Applied translated text to '{item_name_for_log}'.")
         except Exception as e_apply:
             logger.error(f"Error applying translated text to '{item_name_for_log}': {e_apply}", exc_info=True)
             if log_func: log_func(f"      ERROR: Failed to apply translated text to '{item_name_for_log}': {e_apply}")
 
-
         # 5. Restore original text frame properties
         try:
             for prop_name, original_value in original_tf_properties.items():
-                if original_value is not None : # Only restore if we had an original value
-                    # word_wrap might be intentionally kept as True for better multi-language display
+                if original_value is not None :
                     if prop_name == 'word_wrap' and text_frame_obj.word_wrap is True and original_value is False:
                         if log_func: log_func(f"      Keeping word_wrap=True for '{item_name_for_log}' for better i18n display (original was False).")
-                        continue # Skip restoring word_wrap if it was False and now True
+                        continue
                     setattr(text_frame_obj, prop_name, original_value)
         except Exception as e_prop_restore:
             logger.debug(f"Error restoring text_frame properties for '{item_name_for_log}': {e_prop_restore}")
+
 
 
     def translate_presentation_stage1(self, prs: Presentation, src_lang_ui_name: str, tgt_lang_ui_name: str,

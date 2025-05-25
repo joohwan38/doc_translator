@@ -544,6 +544,7 @@
                         <tbody id="history-body"></tbody>
                     </table>
                 </div>
+                <button id="openLogFolderBtn">Open Log Folder</button>
             </div>
         </div>
     </div>
@@ -1246,6 +1247,34 @@
             } catch (error) { console.error("Exception loading history:", error); addLog('error_history_load_exception', true, 'error', { message: error.message }); }
         }
 
+        const openLogFolderBtn = document.getElementById('openLogFolderBtn');
+
+        if (openLogFolderBtn) {
+            openLogFolderBtn.addEventListener('click', async () => {
+                try {
+                    console.log('로그 폴더 열기 버튼 클릭됨');
+                    // preload.js를 통해 노출된 openLogFolder 함수 호출
+                    const result = await window.electronAPI.openLogFolder();
+
+                    if (result.success) {
+                        console.log('로그 폴더 열기 성공:', result.path);
+                        // 필요하다면 사용자에게 성공 알림 (예: alert 또는 UI 메시지)
+                        // alert(`로그 폴더가 열렸습니다: ${result.path}`);
+                    } else {
+                        console.error('로그 폴더 열기 실패:', result.message);
+                        // 사용자에게 오류 알림
+                        alert(`로그 폴더를 열 수 없습니다: ${result.message}`);
+                    }
+                } catch (error) {
+                    console.error('로그 폴더 열기 중 예외 발생:', error);
+                    alert('로그 폴더를 여는 중 오류가 발생했습니다.');
+                }
+            });
+        } else {
+            console.error("'openLogFolderBtn' ID를 가진 버튼을 찾을 수 없습니다.");
+        }
+
+
         async function startActualTranslation() {
             if (!currentServerFilePath || !currentFileObject) {
                 addLog('error_no_file_for_translation', true, 'error');
@@ -1440,33 +1469,6 @@
         // --- Initialization ---
         window.addEventListener('load', async () => {
             console.log("Page loaded, starting initialization.");
-            // Suggested i18n keys (add to your language JSON files):
-            // i18nResources.modal_recommend_gemma_title = "Translation Quality Optimization";
-            // i18nResources.modal_recommend_gemma_message = "Translation is possible with your selected model ({selectedModel}), but for optimal quality, we recommend using the '{defaultModelName}' model. It's not currently installed. Download '{defaultModelName}' now?";
-            // i18nResources.modal_button_download_gemma = "Download {defaultModelName}";
-            // i18nResources.modal_button_proceed_anyway = "Proceed with Current Model";
-            // i18nResources.modal_button_cancel_recommendation = "Cancel"; // If you add a third button
-            // i18nResources.log_gemma_recommendation_shown = "Recommended model ({defaultModelName}) download prompt shown.";
-            // i18nResources.log_user_chose_to_download_gemma = "User chose to download the recommended model ({defaultModelName}).";
-            // i18nResources.log_user_proceeded_without_gemma = "User proceeded with the currently selected model ({selectedModel}) without downloading {defaultModelName}.";
-            // i18nResources.start_translation_button_retry = "Retry Translation";
-            // i18nResources.stopping_translation_button = "Stopping...";
-            // i18nResources.model_downloading_button = "Model Downloading...";
-            // i18nResources.status_default_model_missing_install_prompt = "Default model '{modelName}' is not found. Attempting to install...";
-            // i18nResources.status_model_pulling = "Downloading model {modelName}...";
-            // i18nResources.error_model_pull_start_failed = "Failed to start model download.";
-            // i18nResources.log_model_pull_starting = "Starting model download for {modelName}...";
-            // i18nResources.log_model_pull_error = "Error downloading model {modelName}: {details}";
-            // i18nResources.log_model_pull_success = "Model {modelName} downloaded successfully.";
-            // i18nResources.log_model_pull_error_connection = "Connection error while downloading model {modelName}.";
-            // i18nResources.log_model_pull_init_failed = "Failed to initialize model download for {modelName}: {message}";
-            // i18nResources.model_pull_status_downloading_details = "Downloading ({completedMB}MB / {totalMB}MB)";
-            // i18nResources.modal_new_task_title = "Confirm New Task";
-            // i18nResources.modal_new_task_message = "You haven't downloaded the translated file. Start a new task anyway?";
-            // i18nResources.modal_button_yes_proceed = "Yes, Start New";
-            // i18nResources.modal_button_no_cancel = "No, Cancel";
-            // i18nResources.log_user_confirmed_new_task = "User confirmed to proceed with a new task.";
-            // i18nResources.log_user_cancelled_new_task = "User cancelled proceeding with a new task.";
 
             translatedFileAvailableButNotDownloaded = false; 
             const uiLanguageOptions = { "ko": "한국어", "en": "English", "ja": "日本語", "zh-CN": "简体中文", "zh-TW": "繁體中文", "th": "ไทย" };

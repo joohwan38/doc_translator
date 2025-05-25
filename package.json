@@ -1,6 +1,6 @@
 {
     "name": "powerpoint-document-translator",
-    "version": "0.1.0",
+    "version": "1.5.0",
     "description": "PowerPoint Document Translator using Ollama and Electron",
     "main": "main.js",
     "scripts": {
@@ -27,11 +27,14 @@
     "build": {
         "appId": "com.yourcompany.powerpointtranslator",
         "productName": "PowerPoint Document Translator",
+        "hardenedRuntime": true,
+        "gatekeeperAssess": false,
+        "asar": true,
         "files": [
             "main.js",
             "preload.js",
-            "index.html",
             "*.py",
+            "templates/",
             "assets/**/*",
             "locales/**/*",
             "static/**/*",
@@ -39,6 +42,7 @@
             "!*.md"
         ],
         "mac": {
+            "category": "public.app-category.utilities",
             "target": "dmg",
             "icon": "assets/app_icon.icns"
         },
@@ -51,7 +55,8 @@
             "icon": "assets/app_icon.png"
         },
         "directories": {
-            "buildResources": "assets"
+            "buildResources": "assets",
+            "output": "release"
         }
     },
     "repository": {
