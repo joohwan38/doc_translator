@@ -15,6 +15,7 @@ const APP_NAME_FOR_PATHS = "PowerpointDocumentTranslator";
 let APP_DATA_DIR_CONFIG;
 let LOGS_DIR;
 let HISTORY_DIR;
+let pythonUploadFolder; // 전역 변수로 선언
 
 function getPlatformSpecificAppDataPath(appName) {
     // console.log(`[PathUtils] Getting app data path for: "${appName}" on ${process.platform}`);
@@ -41,7 +42,7 @@ async function initializeAppPaths() {
         APP_DATA_DIR_CONFIG = getPlatformSpecificAppDataPath(APP_NAME_FOR_PATHS);
         LOGS_DIR = path.join(APP_DATA_DIR_CONFIG, process.platform === 'darwin' ? 'Logs' : 'logs');
         HISTORY_DIR = path.join(APP_DATA_DIR_CONFIG, 'hist');
-        const pythonUploadFolder = path.join(APP_DATA_DIR_CONFIG, 'uploads');
+        pythonUploadFolder = path.join(APP_DATA_DIR_CONFIG, 'uploads'); // 전역 변수에 할당
 
         console.log("[PathInit] APP_DATA_DIR_CONFIG:", APP_DATA_DIR_CONFIG);
         console.log("[PathInit] LOGS_DIR:", LOGS_DIR);
@@ -58,7 +59,6 @@ async function initializeAppPaths() {
                 }
             } catch (err) {
                 console.error(`[PathInit] Error cleaning up uploads folder ${pythonUploadFolder}:`, err);
-                // 여기서 앱을 중단할 필요는 없을 수 있지만, 로깅은 중요합니다.
             }
         }
         const pathsToEnsure = [APP_DATA_DIR_CONFIG, LOGS_DIR, HISTORY_DIR, pythonUploadFolder];
@@ -305,7 +305,7 @@ app.on('quit', () => {
     }
 });
 
-// IPC Handlers (기존과 동일하게 유지 또는 필요시 간소화)
+// IPC Handlers
 ipcMain.handle('get-flask-port', async () => flaskPort);
 
 ipcMain.handle('open-log-folder', async () => {
@@ -314,10 +314,10 @@ ipcMain.handle('open-log-folder', async () => {
             await shell.openPath(LOGS_DIR);
             return { success: true, path: LOGS_DIR };
         } catch (error) {
-            return { success: false, message: `Failed to open log folder: ${error.message}` };
+            return { success: false, message: `로그 폴더를 여는 데 실패했습니다: ${error.message}` };
         }
     }
-    return { success: false, message: `Log directory not found: ${LOGS_DIR}` };
+    return { success: false, message: `로그 디렉토리를 찾을 수 없습니다: ${LOGS_DIR}` };
 });
 
 ipcMain.handle('delete-translation-history', async () => {
@@ -325,10 +325,23 @@ ipcMain.handle('delete-translation-history', async () => {
     if (fs.existsSync(historyFilePath)) {
         try {
             fs.unlinkSync(historyFilePath);
-            return { success: true, message: 'Translation history deleted.' };
+            return { success: true, message: '번역 기록이 삭제되었습니다.' };
         } catch (error) {
-            return { success: false, message: `Error deleting history: ${error.message}` };
+            return { success: false, message: `기록 삭제 중 오류 발생: ${error.message}` };
         }
     }
-    return { success: true, message: 'Translation history file not found.' };
+    return { success: true, message: '번역 기록 파일을 찾을 수 없습니다.' };
+});
+
+// 출력/업로드 폴더를 열기 위한 IPC 핸들러 추가
+ipcMain.handle('open-output-folder', async () => {
+    if (pythonUploadFolder && fs.existsSync(pythonUploadFolder)) {
+        try {
+            await shell.openPath(pythonUploadFolder);
+            return { success: true, path: pythonUploadFolder };
+        } catch (error) {
+            return { success: false, message: `출력 폴더를 여는 데 실패했습니다: ${error.message}` };
+        }
+    }
+    return { success: false, message: `출력 디렉토리를 찾을 수 없습니다: ${pythonUploadFolder}` };
 });

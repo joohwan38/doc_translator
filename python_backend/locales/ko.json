@@ -156,5 +156,10 @@
     "chart_status_text_collection_complete": "차트 텍스트 수집 완료",
     "chart_status_batch_translation_complete": "차트 텍스트 일괄 번역 완료",
     "chart_status_applying_translation": "차트 번역 적용 중",
-    "status_stopping": "중지 중..."
+    "status_stopping": "중지 중...",
+    "open_output_folder_button": "결과 폴더 열기",
+    "log_output_folder_opened": "결과 폴더가 열렸습니다: {path}",
+    "log_output_folder_open_failed": "결과 폴더를 여는 데 실패했습니다: {message}",
+    "log_output_folder_open_exception": "결과 폴더를 여는 중 예외 발생: {message}",
+    "log_electron_api_not_found_open_folder": "폴더 열기를 위한 Electron API를 찾을 수 없습니다."
 }

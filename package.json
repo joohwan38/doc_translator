@@ -27,7 +27,7 @@
     },
     "build": {
         "appId": "com.yourcompany.powerpointtranslator",
-        "productName": "Document Translator",
+        "productName": "DocumentTranslator",
         "asar": true,
         "files": [
             "main.js",
@@ -50,7 +50,8 @@
             "target": "dmg",
             "icon": "assets/app_icon.icns",
             "gatekeeperAssess": false,
-            "hardenedRuntime": false
+            "hardenedRuntime": false,
+            "identity": null
         },
         "win": {
             "target": "nsis",

@@ -156,5 +156,10 @@
     "chart_status_text_collection_complete": "Chart text collection complete",
     "chart_status_batch_translation_complete": "Chart text batch translation complete",
     "chart_status_applying_translation": "Applying chart translation",
-    "status_stopping": "Stopping..."
+    "status_stopping": "Stopping...",
+    "open_output_folder_button": "Open Output Folder",
+    "log_output_folder_opened": "Output folder opened: {path}",
+    "log_output_folder_open_failed": "Failed to open output folder: {message}",
+    "log_output_folder_open_exception": "Exception opening output folder: {message}",
+    "log_electron_api_not_found_open_folder": "Electron API for opening folder not found."
 }
