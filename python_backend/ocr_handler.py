@@ -195,40 +195,76 @@ class BaseOcrHandlerImpl(AbsOcrHandler):
             raise RuntimeError(f"기본 폰트 로드 실패: {e_default_font}")
 
 
+
     def _calculate_text_dimensions(self, draw: ImageDraw.ImageDraw, text: str, font_size: int,
-                                   render_area_width: int, lang_code: str, is_bold: bool, line_spacing: int) -> tuple[int, int, List[str]]:
-        # 기존 코드 유지
+                                render_area_width: int, lang_code: str, is_bold: bool, line_spacing: int) -> tuple[int, int, List[str]]:
         if font_size < 1: font_size = 1
         current_font = self._get_font(font_size, lang_code=lang_code, is_bold=is_bold)
 
         estimated_chars_per_line = 1
-        if render_area_width > 0:
+        if render_area_width > 0: 
             try:
                 char_w_metric = 0
                 if PILLOW_VERSION_TUPLE >= (9, 2, 0) and hasattr(draw, 'textlength'):
-                    char_w_metric = draw.textlength("W", font=current_font)
-                    if char_w_metric <= 0: char_w_metric = draw.textlength("가", font=current_font)
-                elif hasattr(current_font, 'getlength'):
-                    char_w_metric = current_font.getlength("W")
-                    if char_w_metric <= 0: char_w_metric = current_font.getlength("가")
-                elif hasattr(current_font, 'getsize'):
-                     char_w_metric, _ = current_font.getsize("W")
-                     if char_w_metric <= 0 : char_w_metric, _ = current_font.getsize("가")
+                    # 수정 4: 더 정확한 문자폭 계산을 위해 여러 문자로 평균 계산
+                    test_chars = ["W", "가", "M", "i", "l"]  # 다양한 폭의 문자들
+                    char_widths = []
+                    for test_char in test_chars:
+                        try:
+                            width = draw.textlength(test_char, font=current_font)
+                            if width > 0:
+                                char_widths.append(width)
+                        except:
+                            pass
+                    if char_widths:
+                        char_w_metric = sum(char_widths) / len(char_widths) * 0.85  # 평균의 85%로 더 공격적
+                    
+                elif hasattr(current_font, 'getlength'): 
+                    test_chars = ["W", "가", "M"]
+                    char_widths = []
+                    for test_char in test_chars:
+                        try:
+                            width = current_font.getlength(test_char)
+                            if width > 0:
+                                char_widths.append(width)
+                        except:
+                            pass
+                    if char_widths:
+                        char_w_metric = sum(char_widths) / len(char_widths) * 0.85
+                        
+                elif hasattr(current_font, 'getsize'): 
+                    test_chars = ["W", "가", "M"]
+                    char_widths = []
+                    for test_char in test_chars:
+                        try:
+                            width, _ = current_font.getsize(test_char)
+                            if width > 0:
+                                char_widths.append(width)
+                        except:
+                            pass
+                    if char_widths:
+                        char_w_metric = sum(char_widths) / len(char_widths) * 0.85
 
                 if char_w_metric > 0:
-                    estimated_chars_per_line = max(1, int(render_area_width / char_w_metric))
-                else:
-                    estimated_chars_per_line = max(1, int(render_area_width / (font_size * 0.5 + 1)))
+                    estimated_chars_per_line = max(1, int(render_area_width / char_w_metric * 1.2))  # 1.2배로 더 공격적
+                else: 
+                    estimated_chars_per_line = max(1, int(render_area_width / (font_size * 0.4))) # 0.5 -> 0.4
             except Exception as e_char_width:
                 logger.debug(f"문자 너비 계산 중 예외: {e_char_width}. 근사치 사용.")
-                estimated_chars_per_line = max(1, int(render_area_width / (font_size * 0.6)))
+                estimated_chars_per_line = max(1, int(render_area_width / (font_size * 0.4))) # 0.6 -> 0.4
 
-        wrapper = textwrap.TextWrapper(width=estimated_chars_per_line, break_long_words=True,
-                                       replace_whitespace=False, drop_whitespace=False,
-                                       break_on_hyphens=True)
+        # 수정 5: 줄바꿈 설정을 더 공격적으로
+        wrapper = textwrap.TextWrapper(
+            width=estimated_chars_per_line, 
+            break_long_words=True,
+            replace_whitespace=False, 
+            drop_whitespace=False, 
+            break_on_hyphens=True,
+            expand_tabs=False,
+            tabsize=4
+        )
         wrapped_lines = wrapper.wrap(text)
-        if not wrapped_lines: wrapped_lines = [" "]
-
+        if not wrapped_lines: wrapped_lines = [" "] 
 
         rendered_text_height = 0
         rendered_text_width = 0
@@ -236,16 +272,16 @@ class BaseOcrHandlerImpl(AbsOcrHandler):
         if PILLOW_VERSION_TUPLE >= (9, 2, 0) and hasattr(draw, 'multiline_textbbox'):
             try:
                 text_bbox_args = {'xy': (0,0), 'text': "\n".join(wrapped_lines), 'font': current_font, 'spacing': line_spacing}
-                if PILLOW_VERSION_TUPLE >= (9, 3, 0):
-                    text_bbox_args['anchor'] = "lt"
-
+                if PILLOW_VERSION_TUPLE >= (9, 3, 0): 
+                    text_bbox_args['anchor'] = "lt" 
+                
                 text_bbox = draw.multiline_textbbox(**text_bbox_args)
                 rendered_text_width = text_bbox[2] - text_bbox[0]
                 rendered_text_height = text_bbox[3] - text_bbox[1]
             except Exception as e_mtbox:
                 logger.debug(f"multiline_textbbox 사용 중 예외: {e_mtbox}. 수동 계산으로 대체.")
                 rendered_text_width, rendered_text_height = self._manual_calculate_multiline_dimensions(draw, wrapped_lines, current_font, line_spacing, font_size)
-        else:
+        else: 
             rendered_text_width, rendered_text_height = self._manual_calculate_multiline_dimensions(draw, wrapped_lines, current_font, line_spacing, font_size)
 
         return int(rendered_text_width), int(rendered_text_height), wrapped_lines
@@ -288,7 +324,6 @@ class BaseOcrHandlerImpl(AbsOcrHandler):
 
     def render_translated_text_on_image(self, image_pil_original: Image.Image, box: List[List[int]], translated_text: str,
                                         font_code_for_render='en', original_text="", ocr_angle=None) -> Image.Image:
-        # 기존 코드 유지 (로직 변경 없음)
         img_to_draw_on = image_pil_original.copy()
         draw = ImageDraw.Draw(img_to_draw_on)
 
@@ -298,9 +333,9 @@ class BaseOcrHandlerImpl(AbsOcrHandler):
             min_x, max_x = min(x_coords), max(x_coords)
             min_y, max_y = min(y_coords), max(y_coords)
 
-            if max_x <= min_x or max_y <= min_y:
+            if max_x <= min_x or max_y <= min_y: 
                 logger.warning(f"렌더링 스킵: 유효하지 않은 바운딩 박스 {box} for '{translated_text[:20]}...'")
-                return image_pil_original
+                return image_pil_original 
 
             img_w, img_h = img_to_draw_on.size
             render_box_x1 = max(0, int(min_x))
@@ -308,9 +343,9 @@ class BaseOcrHandlerImpl(AbsOcrHandler):
             render_box_x2 = min(img_w, int(max_x))
             render_box_y2 = min(img_h, int(max_y))
 
-            if render_box_x2 <= render_box_x1 or render_box_y2 <= render_box_y1:
+            if render_box_x2 <= render_box_x1 or render_box_y2 <= render_box_y1: 
                 logger.warning(f"렌더링 스킵: 크기가 0인 렌더 박스 for '{translated_text[:20]}...'")
-                return img_to_draw_on
+                return img_to_draw_on 
 
             bbox_width_orig = max_x - min_x
             bbox_height_orig = max_y - min_y
@@ -319,88 +354,92 @@ class BaseOcrHandlerImpl(AbsOcrHandler):
 
         except Exception as e_box_calc:
             logger.error(f"렌더링 바운딩 박스 계산 오류: {e_box_calc}. Box: {box}. 원본 이미지 반환.", exc_info=True)
-            return image_pil_original
+            return image_pil_original 
 
         try:
             text_roi_pil = image_pil_original.crop((render_box_x1, render_box_y1, render_box_x2, render_box_y2))
-            estimated_bg_color = get_quantized_dominant_color(text_roi_pil) if text_roi_pil.width > 0 and text_roi_pil.height > 0 else (200,200,200)
+            estimated_bg_color = get_quantized_dominant_color(text_roi_pil) if text_roi_pil.width > 0 and text_roi_pil.height > 0 else (200,200,200) 
         except Exception as e_bg:
             logger.warning(f"배경색 추정 실패 ({e_bg}), 기본 회색 사용.", exc_info=True)
-            estimated_bg_color = (200, 200, 200)
+            estimated_bg_color = (200, 200, 200) 
 
         draw.rectangle([render_box_x1, render_box_y1, render_box_x2, render_box_y2], fill=estimated_bg_color)
-        text_color = get_contrasting_text_color(estimated_bg_color)
+        text_color = get_contrasting_text_color(estimated_bg_color) 
 
-        padding_x = max(1, int(bbox_width_render * 0.03))
-        padding_y = max(1, int(bbox_height_render * 0.03))
+        # 수정 1: 패딩을 줄여 더 공격적으로 공간 활용
+        padding_x = max(1, int(bbox_width_render * 0.02))  # 3% -> 2%로 줄임
+        padding_y = max(1, int(bbox_height_render * 0.02))  # 3% -> 2%로 줄임
 
         render_area_x_start = render_box_x1 + padding_x
         render_area_y_start = render_box_y1 + padding_y
         render_area_width = bbox_width_render - 2 * padding_x
         render_area_height = bbox_height_render - 2 * padding_y
 
-        if render_area_width <= 1 or render_area_height <= 1:
+        if render_area_width <= 1 or render_area_height <= 1: 
             logger.debug(f"렌더링 영역 너무 작음 ({render_area_width}x{render_area_height}), 텍스트 없이 배경만 칠해진 이미지 반환.")
-            return img_to_draw_on
+            return img_to_draw_on 
 
         font_size_correction_factor = 1.0
         text_angle_deg = 0.0
-        if ocr_angle is not None and isinstance(ocr_angle, (int, float)):
-            text_angle_deg = abs(ocr_angle)
-            if 5 < text_angle_deg < 85 or 95 < text_angle_deg < 175:
-                font_size_correction_factor = max(0.6, 1.0 - (text_angle_deg / 90.0) * 0.3)
-        elif bbox_width_orig > 0 and bbox_height_orig > 0 :
+        if ocr_angle is not None and isinstance(ocr_angle, (int, float)): 
+            text_angle_deg = abs(ocr_angle) 
+            if 5 < text_angle_deg < 85 or 95 < text_angle_deg < 175: 
+                font_size_correction_factor = max(0.6, 1.0 - (text_angle_deg / 90.0) * 0.3) 
+        elif bbox_width_orig > 0 and bbox_height_orig > 0 : 
             aspect_ratio_orig = bbox_width_orig / bbox_height_orig
-            if aspect_ratio_orig > 2.0 or aspect_ratio_orig < 0.5:
-                font_size_correction_factor = 0.80
+            if aspect_ratio_orig > 2.0 or aspect_ratio_orig < 0.5: 
+                font_size_correction_factor = 0.80 
 
-        initial_target_font_size = int(min(render_area_height * 0.9,
-                                    render_area_width * 0.9 / (len(translated_text.splitlines()[0] if translated_text else "A")*0.5 +1)
-                                   ) * font_size_correction_factor)
-        initial_target_font_size = max(initial_target_font_size, 1)
+        # 수정 2: 초기 폰트 크기 계산을 더 공격적으로
+        initial_target_font_size = int(min(render_area_height * 0.95,  # 0.9 -> 0.95로 증가
+                                    render_area_width * 0.95 / (len(translated_text.splitlines()[0] if translated_text else "A")*0.4 +1)  # 0.5 -> 0.4로 줄임
+                                ) * font_size_correction_factor) 
+        initial_target_font_size = max(initial_target_font_size, 1) 
 
-        min_font_size = 5
-        if initial_target_font_size < min_font_size: initial_target_font_size = min_font_size
+        # 수정 3: 최소 폰트 크기를 더 합리적으로 설정
+        min_font_size = max(8, int(min(render_area_height, render_area_width) * 0.08))  # 5 -> 8 이상, 동적 계산
+        if initial_target_font_size < min_font_size: 
+            initial_target_font_size = min_font_size
 
         is_bold_font = '_bold' in font_code_for_render or 'bold' in font_code_for_render.lower()
-        best_fit_size = min_font_size
+        best_fit_size = min_font_size 
         best_wrapped_lines: List[str] = []
         best_text_width = 0
         best_text_height = 0
         low = min_font_size
         high = initial_target_font_size
-        max_iterations = int(math.log2(high - low + 1)) + 5 if high > low else 5
+        max_iterations = int(math.log2(high - low + 1)) + 5 if high > low else 5 
         current_iteration = 0
 
         while low <= high and current_iteration < max_iterations:
             current_iteration +=1
             mid_font_size = low + (high - low) // 2
-            if mid_font_size < min_font_size : mid_font_size = min_font_size
-            if mid_font_size == 0 : break
+            if mid_font_size < min_font_size : mid_font_size = min_font_size 
+            if mid_font_size == 0 : break 
 
-            current_line_spacing = int(mid_font_size * 0.2)
+            current_line_spacing = int(mid_font_size * 0.15)  # 0.2 -> 0.15로 줄여 라인 간격 압축
             w, h, wrapped = self._calculate_text_dimensions(draw, translated_text, mid_font_size,
                                                             render_area_width, font_code_for_render,
                                                             is_bold_font, current_line_spacing)
-            if w <= render_area_width and h <= render_area_height:
+            if w <= render_area_width and h <= render_area_height: 
                 best_fit_size = mid_font_size
                 best_wrapped_lines = wrapped
                 best_text_width = w
                 best_text_height = h
-                low = mid_font_size + 1
-            else:
-                high = mid_font_size - 1
+                low = mid_font_size + 1 
+            else: 
+                high = mid_font_size - 1 
 
-        if not best_wrapped_lines:
-            final_line_spacing = int(min_font_size * 0.2)
+        if not best_wrapped_lines: 
+            final_line_spacing = int(min_font_size * 0.15)  # 0.2 -> 0.15
             best_text_width, best_text_height, best_wrapped_lines = self._calculate_text_dimensions(
                 draw, translated_text, min_font_size, render_area_width, font_code_for_render, is_bold_font, final_line_spacing
             )
-            best_fit_size = min_font_size
+            best_fit_size = min_font_size 
 
         final_font_size = best_fit_size
         final_font = self._get_font(final_font_size, lang_code=font_code_for_render, is_bold=is_bold_font)
-        final_line_spacing_render = int(final_font_size * 0.2)
+        final_line_spacing_render = int(final_font_size * 0.15)  # 0.2 -> 0.15
 
         text_x_start = render_area_x_start + (render_area_width - best_text_width) / 2
         text_y_start = render_area_y_start + (render_area_height - best_text_height) / 2
@@ -408,31 +447,31 @@ class BaseOcrHandlerImpl(AbsOcrHandler):
         text_y_start = max(render_area_y_start, text_y_start)
 
         try:
-            if PILLOW_VERSION_TUPLE >= (9,0,0) and hasattr(draw, 'multiline_text'):
+            if PILLOW_VERSION_TUPLE >= (9,0,0) and hasattr(draw, 'multiline_text'): 
                 multiline_args = {
                     'xy': (text_x_start, text_y_start),
                     'text': "\n".join(best_wrapped_lines),
                     'font': final_font,
                     'fill': text_color,
                     'spacing': final_line_spacing_render,
-                    'align': "left"
+                    'align': "left" 
                 }
-                if PILLOW_VERSION_TUPLE >= (9,3,0):
-                    multiline_args['anchor'] = "la"
+                if PILLOW_VERSION_TUPLE >= (9,3,0): 
+                    multiline_args['anchor'] = "la" 
                 draw.multiline_text(**multiline_args)
-            else:
-                 current_y = text_y_start
-                 for line_idx, line_txt in enumerate(best_wrapped_lines):
-                     line_height_val = final_font_size
-                     if hasattr(draw, 'textbbox'):
-                         bbox_args = {'xy': (0,0), 'text': line_txt, 'font': final_font}
-                         if PILLOW_VERSION_TUPLE >= (9,3,0): bbox_args['anchor'] = "lt"
-                         line_bbox = draw.textbbox(**bbox_args)
-                         line_height_val = line_bbox[3] - line_bbox[1] if line_bbox else final_font_size
-                     elif hasattr(final_font, 'getsize'):
+            else: 
+                current_y = text_y_start
+                for line_idx, line_txt in enumerate(best_wrapped_lines):
+                    line_height_val = final_font_size 
+                    if hasattr(draw, 'textbbox'): 
+                        bbox_args = {'xy': (0,0), 'text': line_txt, 'font': final_font}
+                        if PILLOW_VERSION_TUPLE >= (9,3,0): bbox_args['anchor'] = "lt"
+                        line_bbox = draw.textbbox(**bbox_args)
+                        line_height_val = line_bbox[3] - line_bbox[1] if line_bbox else final_font_size
+                    elif hasattr(final_font, 'getsize'):
                         _, line_height_val = final_font.getsize(line_txt)
-                     draw.text((text_x_start, current_y), line_txt, font=final_font, fill=text_color)
-                     current_y += line_height_val + (final_line_spacing_render if line_idx < len(best_wrapped_lines) -1 else 0)
+                    draw.text((text_x_start, current_y), line_txt, font=final_font, fill=text_color)
+                    current_y += line_height_val + (final_line_spacing_render if line_idx < len(best_wrapped_lines) -1 else 0)
         except Exception as e_draw:
             logger.error(f"텍스트 렌더링 중 오류: {e_draw}", exc_info=True)
 
