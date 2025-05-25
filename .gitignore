@@ -5,6 +5,9 @@ build/
 dist/
 wheels/
 files/
+temp/
+python_runtime/
+python_deps/
 node_modules/
 *.egg-info
 
