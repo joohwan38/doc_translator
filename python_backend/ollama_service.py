@@ -303,7 +303,6 @@ class OllamaService(AbsOllamaService):
             
         if not initial_state_exists:
             logger.error(f"_pull_model_worker: No state found for {model_name} upon worker start. Aborting pull.")
-            # 이 경우, _cleanup_model_state를 호출할 필요 없음 (상태 자체가 없으므로)
             return False
 
         running, _ = self.is_running()
@@ -314,12 +313,12 @@ class OllamaService(AbsOllamaService):
             return False
 
         response = None
-        success_status_received = False
-        final_status_text_for_cleanup = "Worker finished unexpectedly"
+        success_status_received = False # 이 변수는 루프 후 최종 확인용으로 유지
+        final_status_text_for_cleanup = "Worker finished unexpectedly" # 기본값
 
         try:
             logger.info(f"{model_name} 모델 실제 다운로드 시작 (Ollama API 호출)...")
-            self._update_pull_progress(model_name, f"Starting download: {model_name}", 0, 0, False)
+            self._update_pull_progress(model_name, f"Starting download: {model_name}", 0, 0, False, None) # 시작 시 error는 None
             
             current_pull_timeout = self.pull_read_timeout
             
@@ -335,39 +334,45 @@ class OllamaService(AbsOllamaService):
                     logger.info(f"{model_name} 모델 다운로드 중지됨 (사용자 요청).")
                     self._update_pull_progress(model_name, "Download stopped by user", 0, 0, True, "Stopped by user")
                     final_status_text_for_cleanup = "Stopped by user"
-                    return False # 여기서 리턴하면 finally에서 정리
+                    return False 
 
                 if line:
                     try:
                         data = json.loads(line.decode('utf-8'))
-                        status = data.get("status", "")
+                        status_from_api = data.get("status", "") # API에서 받은 원본 status
                         completed = data.get("completed", 0)
                         total = data.get("total", 0)
-                        error_detail = data.get("error")
+                        error_detail_from_api = data.get("error") # API에서 받은 error
 
-                        if error_detail:
-                            error_msg = f"Error pulling model {model_name}: {error_detail}"
+                        if error_detail_from_api: # API가 명시적 에러를 보내면, 이것이 우선
+                            error_msg = f"Error pulling model {model_name} from API: {error_detail_from_api}"
                             logger.error(error_msg)
-                            self._update_pull_progress(model_name, status, completed, total, True, error_detail)
-                            final_status_text_for_cleanup = f"Error: {error_detail}"
-                            return False
+                            # API 에러 시, status는 API에서 온 것을 사용하고, error_detail 전달
+                            self._update_pull_progress(model_name, status_from_api, completed, total, True, error_detail_from_api)
+                            final_status_text_for_cleanup = f"Error from API: {error_detail_from_api}"
+                            return False # 오류로 간주하고 종료
 
-                        is_done_from_ollama = status.lower() == "success"
-                        if is_done_from_ollama:
-                            success_status_received = True
+                        is_done_from_ollama = status_from_api.lower() == "success"
                         
-                        progress_text = status
-                        if "downloading" in status.lower(): progress_text = "downloading"
-                        elif "verifying" in status.lower(): progress_text = "verifying"
-                        elif "extracting" in status.lower(): progress_text = "extracting"
+                        current_status_text_for_update = status_from_api # 기본적으로 API status 사용
                         
-                        self._update_pull_progress(model_name, progress_text, completed, total, is_done_from_ollama)
-
                         if is_done_from_ollama:
+                            success_status_received = True # 성공 플래그 설정
+                            current_status_text_for_update = "Completed successfully" # 명확한 성공 메시지 설정
                             logger.info(f"모델 {model_name} 다운로드 성공 (Ollama API 'success' 수신).")
-                            self.invalidate_models_cache()
+                            self.invalidate_models_cache() # 성공 시 캐시 무효화
                             final_status_text_for_cleanup = "Completed successfully"
-                            return True # 성공 시 여기서 리턴
+                            # 성공 상태 업데이트 (error는 None으로 명시)
+                            self._update_pull_progress(model_name, current_status_text_for_update, completed, total, True, None)
+                            return True # 성공적으로 작업 완료, 여기서 종료
+                        else:
+                            # 진행 중인 상태에 대한 텍스트 가공 (선택적)
+                            if "downloading" in status_from_api.lower(): current_status_text_for_update = "downloading"
+                            elif "verifying" in status_from_api.lower(): current_status_text_for_update = "verifying"
+                            elif "extracting" in status_from_api.lower(): current_status_text_for_update = "extracting"
+                            # 진행 중 상태 업데이트 (error는 None으로 명시)
+                            self._update_pull_progress(model_name, current_status_text_for_update, completed, total, False, None)
+
                     except json.JSONDecodeError:
                         logger.debug(f"JSON 디코딩 오류 (무시 가능, 스트림 라인): {line.decode('utf-8', errors='ignore')}")
                     except Exception as e_stream_proc:
@@ -377,11 +382,12 @@ class OllamaService(AbsOllamaService):
                         final_status_text_for_cleanup = f"Stream error: {str(e_stream_proc)}"
                         return False
             
-            if not success_status_received: # 루프 정상 종료했으나 success 못 받은 경우
-                logger.warning(f"{model_name} 모델 다운로드 확인 실패 (스트림 종료, 'success' 메시지 없음).")
-                self._update_pull_progress(model_name, "Stream ended without success", 0, 0, True, "Incomplete stream")
+            # 루프가 정상적으로 (break 없이) 끝났는데 success_status_received가 False인 경우 (이론상 발생하기 어려움, API가 success 없이 스트림을 닫는 경우)
+            if not success_status_received:
+                logger.warning(f"{model_name} 모델 다운로드 스트림이 종료되었으나 'success' 메시지를 받지 못했습니다.")
+                self._update_pull_progress(model_name, "Stream ended without explicit success", 0, 0, True, "Incomplete stream or API behavior change")
                 final_status_text_for_cleanup = "Incomplete stream"
-            return False
+            return False # success를 명시적으로 받지 못하면 실패로 간주 (또는 다른 정책 적용)
 
         except requests.exceptions.RequestException as e_req:
             error_msg = f"Ollama 모델 다운로드 요청 오류 ({model_name}): {e_req}"
@@ -400,15 +406,11 @@ class OllamaService(AbsOllamaService):
                 try: response.close()
                 except Exception: pass
             
-            # 워커 스레드 종료 시 상태 정리 (중요)
-            # final_status_text_for_cleanup는 try 블록에서 설정된 마지막 상태를 반영
             self._cleanup_model_state(model_name, final_status_text_for_cleanup)
 
     def start_model_pull(self, model_name: str) -> tuple[bool, str]:
         with self._model_pull_state_lock:
-            # 다른 모델의 pull 작업이 있다면, 우선 중지 및 정리 (선택적 정책)
-            # 예를 들어, 한 번에 하나의 모델만 pull 하도록 강제할 수 있음
-            # 여기서는 기존 진행 중인 동일 모델 pull만 확인
+
             if model_name in self._model_pull_states:
                 state = self._model_pull_states[model_name]
                 if state.get("thread") and state["thread"].is_alive():
@@ -416,12 +418,7 @@ class OllamaService(AbsOllamaService):
                     return True, f"Model pull for {model_name} is already in progress."
                 else: # 스레드가 없거나 죽었지만 상태가 남아있는 경우 (예: 이전 오류)
                     logger.info(f"Previous pull state for {model_name} found (status: {state.get('status')}). Cleaning up before new pull.")
-                    # _cleanup_model_state 내부에서 락을 다시 잡으려 하지 않도록 주의
-                    # 여기서는 해당 model_name의 상태만 del하고 새 상태로 덮어쓰는 방식으로 처리 가능
-                    # 또는 _cleanup_model_state를 호출하지 않고, 새 상태로 바로 덮어쓰기.
-                    # 더 안전하게는, _cleanup_model_state를 호출하기 전에 락을 풀고, 호출 후 다시 잡거나,
-                    # _cleanup_model_state가 락을 내부에서 관리하도록 수정.
-                    # 지금은 단순히 새 상태로 덮어쓰는 것으로 가정하고, _pull_model_worker의 finally에서 최종 정리.
+ 
                     del self._model_pull_states[model_name]
 
 

@@ -40,7 +40,7 @@ UPLOAD_FOLDER = os.path.join(APP_DATA_DIR_CONFIG, 'uploads') # 예: ~/.config/Po
 # HISTORY_DIR = os.path.join(APP_DATA_DIR_CONFIG, "hist")
 
 # DEFAULT_OLLAMA_MODEL 설정 (이미 있다면 값 확인)
-DEFAULT_OLLAMA_MODEL = "gemma3:12b" # index.html에서 사용하는 기본 모델명과 일치
+DEFAULT_OLLAMA_MODEL = "gemma3:latest" # index.html에서 사용하는 기본 모델명과 일치
 
 ALLOWED_EXTENSIONS = {'pptx'}
 
@@ -66,7 +66,7 @@ def get_history_dir():
     return os.path.join(get_app_data_dir(), "hist")
 
 APP_NAME = "Powerpoint Document Translator"
-DEFAULT_OLLAMA_MODEL = "gemma3:12b"
+DEFAULT_OLLAMA_MODEL = "gemma3:latest"
 TRANSLATION_LANGUAGES_MAP = {
     "ko": "Korean",  # 내부적으로 사용할 코드와 기본 영문 이름
     "ja": "Japanese",

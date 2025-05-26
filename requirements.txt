@@ -33,8 +33,6 @@ markupsafe==3.0.2
 matplotlib==3.10.3
 networkx==3.4.2
 numpy==1.26.4
-opencv-contrib-python==4.11.0.86
-opencv-python==4.11.0.86
 opencv-python-headless==4.11.0.86
 opt-einsum==3.3.0
 packaging==25.0
