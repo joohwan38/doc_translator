@@ -848,6 +848,9 @@ requires-dist = [
     { name = "wheel", specifier = ">=0.45.1" },
 ]
 
+[package.metadata.requires-dev]
+dev = []
+
 [[package]]
 name = "protobuf"
 version = "6.31.0"

@@ -1,11 +1,11 @@
 {
     "name": "document-translator",
-    "version": "1.5.0",
+    "version": "1.7.0",
     "description": "PowerPoint Document Translator using Ollama and Electron",
     "main": "main.js",
     "scripts": {
         "start": "electron .",
-        "dist:mac": "electron-builder --mac",
+        "dist:mac": "electron-builder --mac ",
         "dist": "electron-builder"
     },
     "keywords": [
@@ -22,37 +22,56 @@
         "find-free-port": "^2.0.0"
     },
     "devDependencies": {
+        "@electron/notarize": "^3.0.1",
+        "dotenv": "^16.5.0",
         "electron": "^29.0.0",
         "electron-builder": "^24.9.1"
     },
     "build": {
-        "appId": "com.yourcompany.powerpointtranslator",
+        "appId": "com.joohwan.doctranslator",
         "productName": "DocumentTranslator",
         "asar": true,
         "files": [
             "main.js",
             "preload.js",
             "assets/**/*",
-            "!*.md"
+            "!*.md",
+            "!python_runtime/**/__pycache__/**/*",
+            "!**/__pycache__/**/*",
+            "!**/*.pyc",
+            "!node_modules/**"
         ],
         "extraResources": [
-        {
-          "from": "./python_runtime/", 
-          "to": "python_runtime",    
-          "filter": ["**/*"]
-        },      { 
-        "from": "./python_backend/", 
-        "to": "python_backend", 
-        "filter": ["**/*"]
-      }],
+            {
+                "from": "./python_runtime/",
+                "to": "python_runtime",
+                "filter": [
+                    "**/*",
+                    "!**/*.pyc",
+            "!**/__pycache__/**"
+                ]
+            },
+            {
+                "from": "./python_backend/",
+                "to": "python_backend",
+                "filter": [
+                    "**/*",
+                    "!**/*.pyc",
+            "!**/__pycache__/**"
+                ]
+            }
+        ],
         "mac": {
             "category": "public.app-category.utilities",
             "target": "dmg",
             "icon": "assets/app_icon.icns",
-            "gatekeeperAssess": false,
-            "hardenedRuntime": false,
-            "identity": null
+            "hardenedRuntime": true,
+            "identity": "joohwan sohn (R4G7STHU64)",
+            "entitlements": "build/entitlements.mac.plist",
+            "entitlementsInherit": "build/entitlements.mac.inherit.plist",
+            "notarize": false
         },
+        "afterSign": "scripts/notarize.js",
         "win": {
             "target": "nsis",
             "icon": "assets/app_icon.ico"
@@ -64,6 +83,9 @@
         "directories": {
             "buildResources": "assets",
             "output": "release"
+        },
+        "dmg": {
+            "sign": false
         }
     },
     "repository": {
