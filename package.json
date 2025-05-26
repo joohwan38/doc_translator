@@ -38,8 +38,7 @@
             "!*.md",
             "!python_runtime/**/__pycache__/**/*",
             "!**/__pycache__/**/*",
-            "!**/*.pyc",
-            "!node_modules/**"
+            "!**/*.pyc"
         ],
         "extraResources": [
             {
@@ -48,7 +47,7 @@
                 "filter": [
                     "**/*",
                     "!**/*.pyc",
-            "!**/__pycache__/**"
+                    "!**/__pycache__/**"
                 ]
             },
             {
@@ -57,7 +56,7 @@
                 "filter": [
                     "**/*",
                     "!**/*.pyc",
-            "!**/__pycache__/**"
+                    "!**/__pycache__/**"
                 ]
             }
         ],
@@ -69,7 +68,8 @@
             "identity": "joohwan sohn (R4G7STHU64)",
             "entitlements": "build/entitlements.mac.plist",
             "entitlementsInherit": "build/entitlements.mac.inherit.plist",
-            "notarize": false
+            "notarize": false,
+            "sign": false
         },
         "afterSign": "scripts/notarize.js",
         "win": {

@@ -36,50 +36,69 @@ class OllamaService(AbsOllamaService):
     def url(self) -> str:
         return self._url
 
-    def is_installed(self) -> bool:
-        # 기존 코드 유지
+    def is_installed(self) -> bool: 
         try:
             if shutil.which('ollama'):
                 logger.debug("Ollama found in PATH via shutil.which")
                 return True
             system = platform.system()
-            if system == "Windows":
-                paths_to_check = [
-                    "C:\\Program Files\\Ollama\\ollama.exe",
-                    os.path.expanduser("~\\AppData\\Local\\Ollama\\ollama.exe"),
-                    os.path.expanduser("~\\AppData\\Local\\Programs\\Ollama\\ollama.exe")
-                ]
-                for path in paths_to_check:
-                    if os.path.exists(path):
-                        logger.debug(f"Ollama found at: {path}")
-                        return True
-            elif system == "Darwin": # macOS
-                paths_to_check = [
-                    "/usr/local/bin/ollama",
-                    "/opt/homebrew/bin/ollama",
-                    "/Applications/Ollama.app/Contents/MacOS/ollama",
-                    "/Applications/Ollama.app/Contents/Resources/ollama"
-                ]
-                for path in paths_to_check:
-                    if os.path.exists(path):
-                        logger.debug(f"Ollama found at: {path}")
-                        return True
-            elif system == "Linux":
-                paths_to_check = [
-                    "/usr/local/bin/ollama",
-                    "/usr/bin/ollama",
-                    "/bin/ollama",
-                    os.path.expanduser("~/.local/bin/ollama")
-                ]
-                for path in paths_to_check:
-                    if os.path.exists(path):
-                        logger.debug(f"Ollama found at {path}")
-                        return True
-            logger.debug("Ollama executable not found in common locations or PATH.")
+     
+            exe_path = self._get_ollama_executable_path() # 경로 탐색 로직 재활용
+            if exe_path:
+                logger.debug(f"is_installed: Ollama 확인됨 (경로: {exe_path})")
+                return True
+            
+            logger.debug("is_installed: Ollama 실행 파일 확인 불가.")
             return False
+
         except Exception as e:
             logger.error(f"Ollama 설치 확인 오류: {e}", exc_info=True)
             return False
+        
+    def _get_ollama_executable_path(self) -> Optional[str]:
+
+        # 1. shutil.which 사용 (PATH 환경 변수 의존)
+        ollama_exe = shutil.which('ollama')
+        if ollama_exe:
+            logger.debug(f"Ollama 실행 파일을 PATH에서 찾음: {ollama_exe}")
+            return ollama_exe
+
+        # 2. 일반적인 설치 위치 확인 (PATH에 없는 경우 대비)
+        system = platform.system()
+        paths_to_check = []
+        if system == "Darwin":  # macOS
+            paths_to_check = [
+                "/usr/local/bin/ollama",
+                "/opt/homebrew/bin/ollama",  # Apple Silicon Homebrew
+                # Ollama.app 번들 내의 CLI 도구 경로 (존재한다면)
+                # 일반적으로 앱 번들의 주 실행 파일은 Contents/MacOS/ 내에 위치합니다.
+                "/Applications/Ollama.app/Contents/MacOS/ollama"
+                # 다른 잠재적 경로들 (예: Ollama 설치 스크립트가 생성하는 경로)
+            ]
+        elif system == "Windows":
+            # Windows용 일반 경로 (is_installed 메서드 참고)
+            paths_to_check = [
+                "C:\\Program Files\\Ollama\\ollama.exe",
+                os.path.expanduser("~\\AppData\\Local\\Ollama\\ollama.exe"),
+                os.path.expanduser("~\\AppData\\Local\\Programs\\Ollama\\ollama.exe")
+            ]
+        elif system == "Linux":
+            # Linux용 일반 경로 (is_installed 메서드 참고)
+            paths_to_check = [
+                "/usr/local/bin/ollama",
+                "/usr/bin/ollama",
+                "/bin/ollama",
+                os.path.expanduser("~/.local/bin/ollama")
+            ]
+        # 기타 OS에 대한 경로 추가 가능
+
+        for path in paths_to_check:
+            if os.path.exists(path) and os.access(path, os.X_OK): # 파일 존재 및 실행 권한 확인
+                logger.debug(f"Ollama 실행 파일을 다음 위치에서 찾음: {path}")
+                return path
+        
+        logger.warning("Ollama 실행 파일을 PATH 또는 일반적인 설치 위치에서 찾을 수 없습니다.")
+        return None
 
     def is_running(self) -> Tuple[bool, Optional[str]]:
         # 기존 코드 유지
@@ -119,36 +138,64 @@ class OllamaService(AbsOllamaService):
         return False, None
 
     def start_ollama(self) -> bool:
-        # 기존 코드 유지
-        if not self.is_installed():
-            logger.warning("Ollama가 설치되어 있지 않아 시작할 수 없습니다.")
-            return False
-        is_already_running, _ = self.is_running()
-        if is_already_running:
+        is_running_now, _ = self.is_running()
+        if is_running_now:
             logger.info("Ollama가 이미 실행 중입니다.")
             return True
+
+        ollama_executable = self._get_ollama_executable_path()
+
+        if not ollama_executable:
+            logger.error("Ollama 실행 파일을 찾을 수 없어 시작할 수 없습니다. Ollama 설치 상태 및 경로를 확인해주세요.")
+            # is_installed()를 호출하여 사용자에게 추가적인 힌트를 줄 수 있습니다.
+            if not self.is_installed(): # is_installed()가 다른 방식으로 확인하는 경우
+                 logger.warning("참고: is_installed() 확인 결과로도 Ollama가 설치되지 않았거나 찾을 수 없는 것으로 나타납니다.")
+            return False
+
         try:
-            logger.info("Ollama 시작 시도 중 ('ollama serve')...")
-            cmd = ["ollama", "serve"]
+            # 실행 시점의 PATH 환경 변수 로깅 (디버깅 목적)
+            current_path_env = os.environ.get('PATH', 'PATH 환경 변수 설정 안됨')
+            logger.debug(f"Ollama 시작 시점의 PATH 환경 변수: {current_path_env}")
+            logger.info(f"Ollama 시작 시도: '{ollama_executable} serve'")
+            
+            cmd = [ollama_executable, "serve"]
+            
             process_options = {'stdout': subprocess.DEVNULL, 'stderr': subprocess.DEVNULL}
             if platform.system() == "Windows":
                 process_options['creationflags'] = subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS
             else:
+                # macOS/Linux에서 프로세스를 완전히 분리하려면 start_new_session=True 사용.
+                # 'ollama serve'는 백그라운드에서 계속 실행되어야 하는 서비스입니다.
                 process_options['start_new_session'] = True
+
             subprocess.Popen(cmd, **process_options)
-            for attempt in range(10):
+
+            # Ollama가 시작될 시간을 잠시 줍니다.
+            for attempt in range(10):  # 최대 10초 대기
                 time.sleep(1)
-                running, _ = self.is_running()
-                if running:
-                    logger.info(f"Ollama 시작 성공 (시도: {attempt + 1})")
+                running_after_start, port = self.is_running()
+                if running_after_start:
+                    logger.info(f"Ollama 시작 성공 (포트: {port}, 시도: {attempt + 1}).")
                     return True
-            logger.warning("Ollama 시작 시간 초과 (10초). 상태를 다시 확인해주세요.")
+            
+            logger.warning("Ollama 시작 후 10초 동안 응답을 감지하지 못했습니다. 상태를 다시 확인해주세요.")
+            # 마지막으로 한 번 더 확인
+            final_check_running, final_port = self.is_running()
+            if final_check_running:
+                logger.info(f"Ollama가 늦게 시작되었지만, 최종 확인 결과 실행 중입니다 (포트: {final_port}).")
+                return True
+            else:
+                logger.error("Ollama 시작에 실패했거나 응답이 없습니다.")
+                return False
+
+        except FileNotFoundError: # _get_ollama_executable_path에서 경로를 찾았으므로, 여기서 발생할 가능성은 낮음
+            logger.error(f"Ollama 실행 파일 '{ollama_executable}'을(를) 찾을 수 없습니다 (예상치 못한 오류).")
             return False
-        except FileNotFoundError:
-            logger.error("Ollama 실행 파일을 찾을 수 없습니다. PATH 설정을 확인하거나 Ollama를 올바르게 설치해주세요.")
+        except PermissionError:
+            logger.error(f"Ollama 실행 파일 '{ollama_executable}'을(를) 실행할 권한이 없습니다.")
             return False
         except Exception as e:
-            logger.error(f"Ollama 시작 오류: {e}", exc_info=True)
+            logger.error(f"Ollama 시작 중 예기치 않은 오류 발생: {e}", exc_info=True)
             return False
 
     def get_text_models(self) -> List[str]:
