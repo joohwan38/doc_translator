@@ -55,10 +55,10 @@ ollama pull gemma3
 
 #### 방법 1: 미리 빌드된 앱 설치하기
 
-1. [Release 페이지](https://github.com/joohwan38/ls_ppt_translator/releases/tag/download)에서 최신 버전의 `ppt_translator.dmg` 파일을 다운로드합니다.
+1. [Release 페이지](https://github.com/joohwan38/doc_translator/releases/tag/download)에서 최신 버전의 `ppt_translator.dmg` 파일을 다운로드합니다.
    - *만약 링크가 작동하지 않는다면 화면의 우측 사이드 메뉴 상단에 있으니 직접 저장소로 입장*
 2. 다운로드한 DMG 파일을 더블클릭하여 마운트합니다.
-3. `ppt_translator.app`을 애플리케이션 폴더로 드래그합니다.
+3. `doctranslator.app`을 애플리케이션 폴더로 드래그합니다.
 4. 최초 실행 시 다음과 같은 경고창이 뜰 수 있습니다. 아래와 같이 진행해 주세요:
    - 시스템 환경설정 > 보안 및 개인 정보 보호에서 "확인 없이 열기" 버튼을 클릭합니다.
 <img width="825" alt="439809034-6929e1ca-e017-4dbe-9022-c3c52c746760" src="https://github.com/user-attachments/assets/87cd9310-43ad-423c-a851-d5dae2964adc" />
@@ -69,9 +69,9 @@ ollama pull gemma3
 
 #### 방법 1: 미리 빌드된 앱 실행하기 (Portable)
 
-1. [Release 페이지](https://github.com/joohwan38/ls_ppt_translator/releases/tag/download)에서 최신 버전의 `ppt_translator.exe` 파일을 다운로드합니다.
+1. [Release 페이지](https://github.com/joohwan38/doc_translator/releases/tag/download)에서 최신 버전의 `ppt_translator.exe` 파일을 다운로드합니다.
 2. 설치를 원하는 위치에 폴더를 생성하고 exe 파일을 이동합니다.
-3. 폴더 내의 `ppt_translator.exe` 파일을 실행합니다.
+3. 폴더 내의 `doctranslator.exe` 파일을 실행합니다.
 ---
 
 ## 🔧 사용 방법
@@ -85,9 +85,9 @@ ollama pull gemma3
 - 업로드된 파일의 슬라이드 수와 텍스트 요소 개수가 표시됩니다
 
 ### 3. 번역 설정
-- **원본 언어**: 자동 감지 또는 수동 선택
-- **번역 언어**: 번역할 대상 언어 선택
-- **Ollama 모델**: 사용할 AI 모델 선택
+- **원본 언어**: 원본문서의 언어 선택
+- **번역 언어**: 번역이 될 언어 선택
+- **Ollama 모델**: 사용할 AI 모델 선택 (추천 gemma3)
 
 ### 4. 번역 실행
 - '번역 시작' 버튼을 클릭하여 번역을 시작합니다
@@ -96,7 +96,7 @@ ollama pull gemma3
 
 ### 5. 결과 저장
 - 번역이 완료되면 '번역된 파일 다운로드' 버튼으로 파일을 저장합니다
-- '저장된 파일 열기' 버튼으로 번역된 파일을 바로 열 수 있습니다
+- '결과 폴더 열기' 버튼으로 임시저장 파일이 있는 폴더를 바로 열 수 있습니다
 
 ## 💻 기술 스택
 - **프론트엔드**: HTML5, CSS3, JavaScript
