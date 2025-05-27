@@ -10,7 +10,7 @@ exports.default = async function notarizing(context) {
     console.log('Not a macOS build, skipping notarization.');
     return;
   }
-  if (process.env.SKIP_NOTARIZE === 'true') {
+  if (process.env.SKIPN === 'true') {
     console.log("🛑 Notarization skipped due to SKIP_NOTARIZE=true");
     return;
   }
