@@ -1,7 +1,7 @@
 # 파워포인트 문서 번역기
 
 <div align="center">
-  <img src="python_backend/static/LINEstudio.png" alt="LINE Studio" width="200"/>
+  <img src="python_backend/static/LINEstudio2.png" alt="LINE Studio" width="200"/>
   <img src="assets/app_icon.png" alt="appicon" width="200"/>
   
   <h3>PowerPoint Document Translator</h3>
