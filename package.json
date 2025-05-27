@@ -65,7 +65,7 @@
             "target": "dmg",
             "icon": "assets/app_icon.icns",
             "hardenedRuntime": false,
-            "identity": "joohwan sohn (R4G7STHU64)",
+            "identity": null,
             "entitlements": "build/entitlements.mac.plist",
             "entitlementsInherit": "build/entitlements.mac.inherit.plist",
             "notarize": false,
