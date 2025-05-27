@@ -116,21 +116,15 @@ ollama pull gemma3
 - 중국어 번체 (zh-TW)
 - 태국어 (th)
 
-## 🤝 기여하기
-1. 이 저장소를 포크합니다
-2. 새로운 기능 브랜치를 생성합니다 (`git checkout -b feature/amazing-feature`)
-3. 변경사항을 커밋합니다 (`git commit -m 'Add some amazing feature'`)
-4. 브랜치에 푸시합니다 (`git push origin feature/amazing-feature`)
-5. Pull Request를 생성합니다
 
 ## 📄 라이선스
 이 프로젝트는 라인스튜디오 라이선스 하에 배포됩니다. 저작권자의 허가가 없는 무단 복제 사용을 금지합니다.
 
 ## 🐛 버그 리포트
-버그를 발견하셨나요? [이슈 페이지](https://github.com/your-org/powerpoint-translator/issues)에서 새로운 이슈를 생성해주세요.
+버그를 발견하셨나요? [이슈 페이지](https://github.com/your-org/doc_translator/issues)에서 새로운 이슈를 생성해주세요.
 
 ## 📞 문의
-- Email: contact@linestudio.com
+- Email: joohwan.son@linecorp.com
 - Website: https://linestudio.com
 
 ---
