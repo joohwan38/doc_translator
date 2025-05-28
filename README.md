@@ -99,7 +99,7 @@ ollama pull gemma3
 
 ## 💻 기술 스택
 - **프론트엔드**: HTML5, CSS3, JavaScript
-- **백엔드**: Electron
+- **백엔드**: Python, Electron
 - **AI/ML**: Ollama (llama2, mistral 등)
 - **파일 처리**: JSZip (PPTX 파일 파싱 및 생성)
 
