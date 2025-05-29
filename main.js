@@ -238,17 +238,24 @@ function startPythonServer() {
                 startupTimeout = setTimeout(() => {
                     if (!resolveInvoked) {
                         resolveInvoked = true;
-                        console.warn(`[PythonServer] Flask server startup timed out after 20s (Port: ${flaskPort}). Proceeding.`);
-                        console.log(`[TIME] startPythonServer - Timeout occurred: ${performance.now().toFixed(2)}`);
-                        
-                        // pythonProcess가 null이 아닐 때만 리스너를 제거하도록 수정
-                        if (pythonProcess) {
+                        // 경고 대신 에러로 로깅하고, 사용자에게 알림
+                        console.error(`[PythonServer] Flask server startup timed out after 20s (Port: ${flaskPort}). The backend failed to start.`);
+                        console.log(`[TIME] startPythonServer - Timeout failure: ${performance.now().toFixed(2)}`);
+
+                        if (pythonProcess) { // pythonProcess가 null이 아닐 때만 리스너 및 kill 처리
                             pythonProcess.stdout.removeListener('data', onStdoutData);
                             pythonProcess.stderr.removeListener('data', onStderrData);
+                            console.log('[PythonServer] Attempting to kill Python process due to startup timeout.');
+                            pythonProcess.kill(); // 응답 없는 프로세스 종료 시도
                         }
-                        resolve(flaskPort);
+                        // UI 로드를 진행하는 대신, 시작 실패로 간주하고 에러 처리
+                        // reject(new Error(`Python server startup timed out on port ${flaskPort}.`)); // app.whenReady().catch() 블록으로 에러 전달
+                        // 또는 직접 다이얼로그 표시 후 앱 종료
+                        dialog.showErrorBox("Backend Startup Timeout", 
+                            `The Python backend server failed to start on port ${flaskPort} within the 20-second time limit. The application will now close.`);
+                        app.quit();
                     }
-                }, 20000);
+                }, 20000); // 20초 타임아웃
             })
             .catch((err) => {
                  // ... (기존 catch 로직과 동일하게 resolveInvoked 확인) ...

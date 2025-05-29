@@ -6,7 +6,7 @@
     "scripts": {
         "start": "electron .",
         "dist:mac": "electron-builder --mac ",
-        "dist": "electron-builder"
+        "dist": "electron-builder --win"
     },
     "keywords": [
         "Electron",

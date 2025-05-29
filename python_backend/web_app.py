@@ -774,35 +774,51 @@ def get_ui_languages_route():
 
 
 if __name__ == '__main__':
-    flask_port_to_use = 5002 # 기본 포트, main.js에서 환경변수로 설정한 값을 우선 사용
+    default_flask_port = 5001  # UI의 일반적인 시작 포트 또는 findFreePort의 시작점
+    flask_port_to_use = default_flask_port
+
+    port_env_var = os.environ.get('FLASK_PORT')
+    if port_env_var:
+        try:
+            flask_port_to_use = int(port_env_var)
+            # main.js 로부터 FLASK_PORT를 성공적으로 받았음을 명시
+            print(f"--- Flask app using FLASK_PORT (from Electron main.js): {flask_port_to_use} ---", flush=True)
+        except ValueError:
+            print(f"--- WARNING: Invalid FLASK_PORT value '{port_env_var}'. Using default port {default_flask_port}. ---", flush=True)
+            flask_port_to_use = default_flask_port
+    else:
+        # 이 경우는 main.js에서 FLASK_PORT를 설정하지 못했거나, web_app.py를 직접 실행한 경우
+        print(f"--- FLASK_PORT environment variable not set. Using default port: {default_flask_port} ---", flush=True)
+
+    print(f"--- Flask app attempting to run on host 127.0.0.1, port {flask_port_to_use} ---", flush=True)
+    sys.stdout.flush()
+
+    # (스케줄러 설정 코드는 기존대로 유지)
+    scheduler = BackgroundScheduler(daemon=True)
+    cleanup_hour = app.config.get('CLEANUP_HOUR', 3)
+    if not scheduler.running:
+        scheduler.add_job(cleanup_old_files_and_tasks, 'cron', hour=cleanup_hour, minute=0, id="cleanup_job", replace_existing=True)
+        try:
+            scheduler.start()
+            logger.info(f"File and task cleanup scheduler started (runs daily at {cleanup_hour:02}:00).")
+        except Exception as e_scheduler:
+            if "conflicting job" in str(e_scheduler).lower() or "already running" in str(e_scheduler).lower():
+                 logger.warning(f"Scheduler job 'cleanup_job' already exists or scheduler already running. Details: {e_scheduler}")
+            else:
+                logger.error(f"Failed to start scheduler: {e_scheduler}")
+
     try:
-        # FLASK_PORT 환경 변수가 main.js에서 설정된 경우 해당 포트 사용
-        port_str = os.environ.get('FLASK_PORT', str(flask_port_to_use))
-        flask_port_to_use = int(port_str)
-        print(f"--- Flask app trying to run on host 127.0.0.1, port {flask_port_to_use} ---", flush=True)
-        sys.stdout.flush() # 강제 플러시
-
-        # 스케줄러 설정 및 시작 (app.run 호출 전으로 이동)
-        cleanup_hour = app.config.get('CLEANUP_HOUR', 3)
-        if not scheduler.running:
-            scheduler.add_job(cleanup_old_files_and_tasks, 'cron', hour=cleanup_hour, minute=0, id="cleanup_job", replace_existing=True)
-            try:
-                scheduler.start()
-                logger.info(f"File and task cleanup scheduler started (runs daily at {cleanup_hour:02}:00).")
-            except Exception as e_scheduler: # 스케줄러 시작 오류 처리
-                if "conflicting job" in str(e_scheduler).lower() or "already running" in str(e_scheduler).lower():
-                     logger.warning(f"Scheduler job 'cleanup_job' already exists or scheduler already running. Details: {e_scheduler}")
-                else:
-                    logger.error(f"Failed to start scheduler: {e_scheduler}")
-        
         app.run(debug=app.config.get('DEBUG', False), host='127.0.0.1', port=flask_port_to_use)
-
-    except ValueError: # int(port_str) 변환 실패 시
-        print(f"--- CRITICAL ERROR: Invalid FLASK_PORT value '{port_str}'. Using default {flask_port_to_use} if possible or failing. ---", flush=True)
-        sys.stdout.flush()
-
+        # app.run이 정상적으로 시작했다가 종료된 경우 (일반적으로 Ctrl+C 등으로 인한 종료)
+        print(f"--- Flask app server on port {flask_port_to_use} has shut down. ---", flush=True)
+    except OSError as e:
+        # 포트 사용 중이거나 권한 문제 등으로 바인딩 실패 시 OSError 발생
+        print(f"--- CRITICAL FLASK ERROR: Failed to bind to 127.0.0.1:{flask_port_to_use}. Error: {e} ---", flush=True)
+        print(f"--- This might be due to the port already being in use or permissions issues. ---", flush=True)
+        # 이 오류를 main.js가 감지할 수 있도록 stderr로 출력되는 것이 중요
     except Exception as e:
-        print(f"--- CRITICAL ERROR in web_app.py __main__: {e} ---", flush=True)
-        traceback.print_exc()
-        sys.stdout.flush()
+        print(f"--- CRITICAL ERROR in web_app.py __main__ trying to run Flask: {e} ---", flush=True)
+        traceback.print_exc() # 전체 트레이스백 출력
+    finally:
+        sys.stdout.flush() # 프로그램 종료 전 모든 버퍼 플러시
 
