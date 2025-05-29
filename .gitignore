@@ -14,3 +14,4 @@ node_modules/
 # Virtual environments
 .venv
 .env
+.DS_Store
