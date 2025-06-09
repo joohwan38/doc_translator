@@ -9,6 +9,7 @@ dependencies = [
     "apscheduler>=3.11.0",
     "flask>=3.1.1",
     "flask-cors>=6.0.0",
+    "openpyxl>=3.1.5",
     "paddleocr==2.9.0",
     "paddlepaddle==3.0.0",
     "pillow>=11.2.1",
