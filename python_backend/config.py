@@ -42,7 +42,7 @@ UPLOAD_FOLDER = os.path.join(APP_DATA_DIR_CONFIG, 'uploads') # 예: ~/.config/Po
 # DEFAULT_OLLAMA_MODEL 설정 (이미 있다면 값 확인)
 DEFAULT_OLLAMA_MODEL = "gemma3:latest" # index.html에서 사용하는 기본 모델명과 일치
 
-ALLOWED_EXTENSIONS = {'pptx'}
+ALLOWED_EXTENSIONS = {'pptx', 'xlsx'}
 
 MAX_TRANSLATION_CACHE_SIZE = 1000
 
@@ -93,6 +93,7 @@ DEBUG_LOG_LEVEL = logging.DEBUG
 WEIGHT_TEXT_CHAR = 1
 WEIGHT_IMAGE = 100
 WEIGHT_CHART = 15
+WEIGHT_EXCEL_CELL = 1
 
 UI_LANG_TO_PADDLEOCR_CODE_MAP = {
     "한국어": "korean", "영어": "en",

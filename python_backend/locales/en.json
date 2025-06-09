@@ -3,7 +3,7 @@
     "status_label": "Status",
     "status_checking": "Checking...",
     "file_select_title": "Select File",
-    "file_upload_label": "Select or drag PowerPoint file here",
+    "file_upload_label": "Select or drag PowerPoint, excel file here",
     "file_info_title": "File Info",
     "file_name_label": "Filename:",
     "slide_count_label": "Slides:",

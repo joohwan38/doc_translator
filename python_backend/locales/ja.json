@@ -3,7 +3,7 @@
     "status_label": "ステータス",
     "status_checking": "確認中...",
     "file_select_title": "ファイル選択",
-    "file_upload_label": "PPTファイルを選択またはドラッグ",
+    "file_upload_label": "PPTX,XlSXファイルを選択またはドラッグ",
     "file_info_title": "ファイル情報",
     "file_name_label": "ファイル名:",
     "slide_count_label": "スライド:",

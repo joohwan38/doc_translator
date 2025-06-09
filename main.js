@@ -16,6 +16,7 @@ let APP_DATA_DIR_CONFIG;
 let LOGS_DIR;
 let HISTORY_DIR;
 let pythonUploadFolder; // 전역 변수로 선언
+let lastDownloadedFilePath = null;
 
 function getPlatformSpecificAppDataPath(appName) {
     // console.log(`[PathUtils] Getting app data path for: "${appName}" on ${process.platform}`);
@@ -327,6 +328,43 @@ ipcMain.handle('open-log-folder', async () => {
     return { success: false, message: `로그 디렉토리를 찾을 수 없습니다: ${LOGS_DIR}` };
 });
 
+ipcMain.handle('save-translated-file', async (event, { tempFilePath, originalPath }) => {
+    if (!tempFilePath || !originalPath) {
+        return { success: false, message: '파일 경로 정보가 누락되었습니다.' };
+    }
+
+    const originalFileName = path.basename(originalPath);
+    const originalFolder = path.dirname(originalPath);
+    const translatedFileName = path.basename(tempFilePath);
+
+    try {
+        const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, {
+            title: '번역된 파일 저장',
+            defaultPath: path.join(originalFolder, translatedFileName),
+            filters: [
+                { name: 'PowerPoint or Excel', extensions: ['pptx', 'xlsx'] },
+                { name: 'All Files', extensions: ['*'] }
+            ]
+        });
+
+        if (canceled || !filePath) {
+            return { success: false, message: '파일 저장이 취소되었습니다.' };
+        }
+
+        // 임시 파일을 사용자가 선택한 경로로 복사합니다.
+        fs.copyFileSync(tempFilePath, filePath);
+        console.log(`[Save] File copied from ${tempFilePath} to ${filePath}`);
+
+        lastDownloadedFilePath = filePath; // [!INFO] 최종 저장 경로를 기억합니다.
+
+        return { success: true, path: filePath };
+
+    } catch (error) {
+        console.error('[Save] Failed to save file:', error);
+        return { success: false, message: `파일 저장 중 오류 발생: ${error.message}` };
+    }
+});
+
 ipcMain.handle('delete-translation-history', async () => {
     const historyFilePath = path.join(HISTORY_DIR, 'translation_history.json');
     if (fs.existsSync(historyFilePath)) {
@@ -342,13 +380,27 @@ ipcMain.handle('delete-translation-history', async () => {
 
 // 출력/업로드 폴더를 열기 위한 IPC 핸들러 추가
 ipcMain.handle('open-output-folder', async () => {
-    if (pythonUploadFolder && fs.existsSync(pythonUploadFolder)) {
+    // [!INFO] --- 디버깅 코드 추가 ---
+    console.log('[FolderOpen] "결과 폴더 열기" 버튼 클릭됨');
+    console.log(`[FolderOpen] 현재 lastDownloadedFilePath 값: ${lastDownloadedFilePath}`);
+
+    let folderToOpen = pythonUploadFolder;
+    if (lastDownloadedFilePath && fs.existsSync(lastDownloadedFilePath)) {
+        folderToOpen = path.dirname(lastDownloadedFilePath);
+        console.log(`[FolderOpen] 열 폴더 경로를 실제 저장된 경로로 변경: ${folderToOpen}`);
+    } else {
+        console.log(`[FolderOpen] 실제 저장된 경로가 없어 임시 폴더를 엽니다: ${folderToOpen}`);
+    }
+
+    if (folderToOpen && fs.existsSync(folderToOpen)) {
         try {
-            await shell.openPath(pythonUploadFolder);
-            return { success: true, path: pythonUploadFolder };
+            await shell.openPath(folderToOpen);
+            return { success: true, path: folderToOpen };
         } catch (error) {
-            return { success: false, message: `출력 폴더를 여는 데 실패했습니다: ${error.message}` };
+            console.error(`[FolderOpen] 폴더 열기 실패: ${error.message}`);
+            return { success: false, message: `폴더를 여는 데 실패했습니다: ${error.message}` };
         }
     }
-    return { success: false, message: `출력 디렉토리를 찾을 수 없습니다: ${pythonUploadFolder}` };
+    console.error(`[FolderOpen] 폴더 경로를 찾을 수 없음: ${folderToOpen}`);
+    return { success: false, message: `디렉토리를 찾을 수 없습니다: ${folderToOpen}` };
 });

@@ -71,6 +71,19 @@ class AbsPptxProcessor(ABC):
                                       ) -> bool:
         pass
 
+class AbsExcelProcessor(ABC):
+    @abstractmethod
+    def get_file_info(self, file_path: str) -> Dict[str, int]:
+        pass
+
+    @abstractmethod
+    def translate_workbook(self, file_path: str, output_path: str, translator: AbsTranslator,
+                           src_lang_ui_name: str, tgt_lang_ui_name: str, model_name: str,
+                           ollama_service: 'AbsOllamaService',
+                           progress_callback: Optional[Callable[[Any, str, float, str], None]] = None,
+                           stop_event: Optional[Any] = None) -> Optional[str]:
+        pass
+
 class AbsChartProcessor(ABC):
     @abstractmethod
     def translate_charts_in_pptx(self, pptx_path: str, src_lang_ui_name: str, tgt_lang_ui_name: str,

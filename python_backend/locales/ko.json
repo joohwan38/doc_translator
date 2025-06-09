@@ -3,7 +3,7 @@
     "status_label": "상태",
     "status_checking": "확인 중...",
     "file_select_title": "파일 선택",
-    "file_upload_label": "PowerPoint 파일을 선택하거나 여기에 드래그하세요",
+    "file_upload_label": "PowerPoint, excel 파일을 선택하거나 여기에 드래그하세요",
     "file_info_title": "파일 정보",
     "file_name_label": "파일명:",
     "slide_count_label": "슬라이드:",

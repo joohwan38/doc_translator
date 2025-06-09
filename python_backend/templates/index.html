@@ -451,8 +451,7 @@
             <div class="panel"> <h2 data-i18n="file_select_title">File Selection</h2>
                 <div class="form-group">
                     <div class="file-upload">
-                        <input type="file" id="file-input" accept=".pptx">
-                        <label for="file-input" class="file-upload-label" data-i18n="file_upload_label">
+                        <input type="file" id="file-input" accept=".pptx,.xlsx"> <label for="file-input" class="file-upload-label" data-i18n="file_upload_label">
                             Select or drag and drop a PowerPoint file here
                         </label>
                     </div>
@@ -560,6 +559,8 @@
         // Global variables
         let currentFileObject = null;
         let currentServerFilePath = null;
+        let currentOriginalFilePath = null; // 원본 파일의 전체 경로 저장용
+        let currentTaskTempOutputPath = null; // 번역된 임시 파일의 전체 경로 저장용
         let currentTranslationTaskId = null;
         let progressEventSource = null;
         let modelPullEventSource = null;
@@ -1175,10 +1176,14 @@
 
             const processFileSelectionActual = async () => {
                 setMainButtonState(APP_STATE.UPLOADING);
-                if (!file.name.toLowerCase().endsWith('.pptx')) {
+                const allowedExtensions = ['.pptx', '.xlsx'];
+                const fileExtension = `.${file.name.split('.').pop().toLowerCase()}`;
+                if (!allowedExtensions.includes(fileExtension)) {
                     addLog('error_invalid_file_type_pptx', true, 'error'); resetFileInput(); return;
                 }
                 currentFileObject = file;
+                currentOriginalFilePath = file.path; // [!INFO] 이 줄을 확인 또는 추가합니다.
+                currentTaskTempOutputPath = null;
                 if (domElements.fileNameDisplay) domElements.fileNameDisplay.textContent = file.name;
                 if (domElements.fileUploadLabel) domElements.fileUploadLabel.textContent = file.name;
                 addLog('file_analyzing', true, 'info');
@@ -1244,6 +1249,10 @@
                 if (domElements.progressStatusDisplay) domElements.progressStatusDisplay.textContent = statusText;
                 if (domElements.currentTaskDisplay) domElements.currentTaskDisplay.textContent = data.current_task || "";
                 if (data.completed) {
+                    if (data.temp_output_path) {
+                        currentTaskTempOutputPath = data.temp_output_path;
+                        console.log(`[Progress] Received temp output path: ${currentTaskTempOutputPath}`);
+                    }
                     progressEventSource.close();
                     if (data.download_url && !data.error) {
                         setMainButtonState(APP_STATE.COMPLETED_SUCCESS);
@@ -1332,7 +1341,8 @@
                 image_translation: domElements.imageTranslationCheckbox.checked,
                 ocr_temperature: parseFloat(domElements.ocrTemperatureSlider.value),
                 ocr_use_gpu: domElements.ocrGpuCheckbox.checked,
-                ui_language: currentUILocale
+                ui_language: currentUILocale,
+                ooriginal_folder_path: currentOriginalFilePath
             };
             try {
                 const response = await fetch('/api/translate', {
@@ -1463,23 +1473,37 @@
                                 setMainButtonState(APP_STATE.IDLE);
                             }
                             break;
+
                         case APP_STATE.COMPLETED_SUCCESS:
-                            console.log(`[Event] 액션 버튼 클릭: 작업 ${lastDownloadedTaskId || currentTranslationTaskId}에 대한 파일 다운로드`);
-                            const taskIdForDownload = lastDownloadedTaskId || currentTranslationTaskId;
-                            if (taskIdForDownload) {
-                                window.location.href = `/api/download/${taskIdForDownload}`; // 이슈2 해결 시 변경될 부분
-                                addLog('log_download_initiated', true, 'info', { taskId: taskIdForDownload });
-                                translatedFileAvailableButNotDownloaded = false;
-                                setMainButtonState(APP_STATE.DOWNLOAD_COMPLETED_CAN_OPEN_FOLDER);
+                            console.log(`[Event] Action button clicked: Save file for task ${currentTranslationTaskId}`);
+
+                            // [!INFO] --- 최종 다운로드 로직 ---
+                            // 원본 파일 경로와, 서버에 임시 저장된 결과물 경로가 모두 있는지 확인
+                            if (currentOriginalFilePath && currentTaskTempOutputPath) {
+
+                                console.log(`[Save] Requesting main process to save. Temp: ${currentTaskTempOutputPath}, Original: ${currentOriginalFilePath}`);
+                                const result = await window.electronAPI.saveTranslatedFile({
+                                    tempFilePath: currentTaskTempOutputPath,
+                                    originalPath: currentOriginalFilePath
+                                });
+
+                                if (result && result.success) {
+                                    addLog(`파일이 성공적으로 저장되었습니다: ${result.path}`, false, 'success');
+                                    setMainButtonState(APP_STATE.DOWNLOAD_COMPLETED_CAN_OPEN_FOLDER);
+                                } else {
+                                    addLog(result.message || '파일 저장이 취소되었거나 실패했습니다.', false, 'warning');
+                                }
+
                             } else {
-                                addLog('error_no_taskid_for_download', true, 'error');
-                                setMainButtonState(APP_STATE.IDLE);
+                                // 이 오류는 정상적인 상황에서는 발생하지 않아야 합니다.
+                                addLog('파일 저장 실패: 원본 또는 결과물 경로를 찾을 수 없습니다.', true, 'error');
+                                console.error(`Save failed. OriginalPath: ${currentOriginalFilePath}, TempOutputPath: ${currentTaskTempOutputPath}`);
+                                setMainButtonState(APP_STATE.COMPLETED_ERROR);
                             }
                             break;
                         case APP_STATE.DOWNLOAD_COMPLETED_CAN_OPEN_FOLDER:
                             console.log(`[Event] 액션 버튼 클릭: 결과 폴더 열기`);
                             try {
-                                // 이슈2 해결 시, 이 부분은 electronAPI.openLastDownloadedFolder() 등으로 변경
                                 if (window.electronAPI && window.electronAPI.openOutputFolder) {
                                     const result = await window.electronAPI.openOutputFolder();
                                     if (result.success) {
@@ -1490,13 +1514,15 @@
                                     }
                                 } else {
                                     addLog('log_electron_api_not_found_open_folder', true, 'error');
-                                    alert('폴더를 열 수 없습니다: API를 사용할 수 없습니다. 빌드 문제 또는 preload 스크립트 문제일 수 있습니다.');
+                                    alert('폴더를 열 수 없습니다: API를 사용할 수 없습니다.');
                                 }
                             } catch (error) {
                                 addLog('log_output_folder_open_exception', true, 'error', { message: error.message });
                                 alert('결과 폴더를 여는 중 오류가 발생했습니다.');
                             }
                             break;
+                        // --- 추가 끝 ---
+
                         default:
                             console.log(`[Event] 액션 버튼이 처리되지 않은 상태에서 클릭됨: ${currentAppState}`);
                             break;

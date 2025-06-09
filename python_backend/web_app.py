@@ -28,6 +28,7 @@ from ollama_service import OllamaService
 from translator import OllamaTranslator
 from pptx_handler import PptxHandler
 from chart_xml_handler import ChartXmlHandler
+from excel_handler import ExcelHandler # 새로 추가
 from ocr_handler import OcrHandlerFactory
 import utils # 유틸리티 모듈 import (open_folder 등)
 
@@ -69,6 +70,7 @@ load_language_resources()
 ollama_service = OllamaService()
 translator = OllamaTranslator()
 pptx_handler = PptxHandler()
+excel_handler = ExcelHandler() # 새로 추가
 # ChartXmlHandler 초기화 시 ollama_service 인스턴스 전달
 chart_processor = ChartXmlHandler(translator, ollama_service)
 ocr_handler_factory = OcrHandlerFactory()
@@ -185,6 +187,8 @@ class TaskProgress:
             }
             if self.output_file and os.path.exists(self.output_file) and (not self.error or self.stop_event.is_set()):
                 final_update_data['download_url'] = f'/api/download/{self.task_id}'
+                final_update_data['temp_output_path'] = self.output_file 
+
             
             self._put_to_queue(final_update_data)
             logger.info(f"Task {self.task_id} marked as final status: {self.status}, Progress: {self.progress}%, Error: {self.error}")
@@ -302,19 +306,40 @@ def start_translation_route(): # 함수 이름 변경
     # TaskProgress 생성 시 ui_language 전달
     task = TaskProgress(task_id, ui_language=ui_lang_code)
     task.original_filepath = filepath # 원본 파일 경로 저장
+    task.original_folder_path = data.get('original_folder_path') # [!INFO] 이 줄을 추가합니다.
+
 
     with tasks_lock:
         tasks[task_id] = task
 
-    thread = threading.Thread(target=translate_worker, args=(
-        task_id, filepath, data['src_lang'], data['tgt_lang'], data['model'],
-        data.get('image_translation', True), 
-        data.get('ocr_temperature', config.DEFAULT_ADVANCED_SETTINGS['ocr_temperature']), # config에서 기본값 사용
-        data.get('ocr_use_gpu', config.DEFAULT_ADVANCED_SETTINGS['ocr_use_gpu'])
-    ))
-    thread.daemon = True
-    thread.start()
-    return jsonify({'task_id': task_id})
+        file_extension = filepath.rsplit('.', 1)[1].lower()
+
+        target_worker = None
+        worker_args = ()
+
+        if file_extension == 'pptx':
+            target_worker = translate_worker
+            worker_args = (
+                task_id, filepath, data['src_lang'], data['tgt_lang'], data['model'],
+                data.get('image_translation', True),
+                data.get('ocr_temperature', config.DEFAULT_ADVANCED_SETTINGS['ocr_temperature']),
+                data.get('ocr_use_gpu', config.DEFAULT_ADVANCED_SETTINGS['ocr_use_gpu'])
+            )
+        elif file_extension == 'xlsx':
+            target_worker = translate_excel_worker
+            worker_args = (
+                task_id, filepath, data['src_lang'], data['tgt_lang'], data['model']
+            )
+
+        if target_worker:
+            thread = threading.Thread(target=target_worker, args=worker_args)
+            thread.daemon = True
+            thread.start()
+            return jsonify({'task_id': task_id})
+        else:
+            # 지원하지 않는 파일 형식 오류 반환
+            return jsonify({'error': 'Unsupported file type for translation.'}), 400
+        # --- 수정 끝 ---
 
 def translate_worker(task_id, filepath, src_lang, tgt_lang, model,
                     image_translation, ocr_temperature, ocr_use_gpu):
@@ -459,6 +484,55 @@ def translate_worker(task_id, filepath, src_lang, tgt_lang, model,
             src_lang, tgt_lang, model, task.status, task_id # task.status는 이미 번역된 텍스트일 수 있음. 키로 저장하려면 변경 필요.
         )
         logger.info(f"Translate worker for task {task_id} finished. Final status: {task.status}")
+
+def translate_excel_worker(task_id, filepath, src_lang, tgt_lang, model):
+    task = tasks.get(task_id)
+    if not task:
+        logger.error(f"Excel Translate worker: Task {task_id} not found.")
+        return
+
+    original_filename_base = os.path.splitext(os.path.basename(filepath))[0]
+    output_filename = f"{original_filename_base}_{tgt_lang}_translated_{task_id[:8]}.xlsx"
+    output_path = os.path.join(app.config['UPLOAD_FOLDER'], output_filename)
+    task.output_file = output_path
+
+    try:
+        task.update_progress("status_key_file_info", "status_task_analyzing", 0, os.path.basename(filepath))
+        file_info = excel_handler.get_file_info(filepath)
+        if file_info.get("error"):
+            raise Exception(file_info["error"])
+
+        task.total_estimated_work = (file_info.get("translatable_cell_count", 0) * config.WEIGHT_EXCEL_CELL) # config에 WEIGHT_EXCEL_CELL = 1 추가 권장
+        if task.total_estimated_work <= 0: task.total_estimated_work = 1
+
+        src_lang_name = config.TRANSLATION_LANGUAGES_MAP.get(src_lang, src_lang)
+        tgt_lang_name = config.TRANSLATION_LANGUAGES_MAP.get(tgt_lang, tgt_lang)
+
+        final_path = excel_handler.translate_workbook(
+            filepath, output_path, translator, src_lang_name, tgt_lang_name,
+            model, ollama_service, task.update_progress, task.stop_event
+        )
+
+        if task.stop_event.is_set():
+            task.mark_as_final_status("status_stopped")
+            return
+
+        if final_path and os.path.exists(final_path):
+            task.output_file = final_path
+            task.mark_as_final_status("status_completed", progress_val=100)
+        else:
+            task.mark_as_final_status("status_error", "Excel translation failed or output file not created.")
+
+    except Exception as e:
+        logger.error(f"Error in translate_excel_worker (task {task_id}): {e}", exc_info=True)
+        task.mark_as_final_status("status_error_worker_exception", f"Unhandled exception in worker: {str(e)}")
+    finally:
+        save_translation_history(
+            os.path.basename(filepath),
+            os.path.basename(task.output_file) if task.output_file else "",
+            src_lang, tgt_lang, model, task.status, task_id
+        )
+        logger.info(f"Excel Translate worker for task {task_id} finished. Final status: {task.status}")
 
 # --- 기존 APScheduler 및 나머지 라우트들 ---
 scheduler = BackgroundScheduler(daemon=True)
@@ -725,7 +799,7 @@ def get_history_route():
 @app.route('/api/file_info', methods=['POST'])
 @error_handler
 def get_file_info_route():
-    ui_lang_code = request.args.get('lang', config.DEFAULT_UI_LANGUAGE) # 또는 request.form.get('ui_language')
+    ui_lang_code = request.args.get('lang', config.DEFAULT_UI_LANGUAGE)
     if 'file' not in request.files:
         error_msg = language_resources.get(ui_lang_code, {}).get("error_no_file_provided", "No file provided.")
         return jsonify({'error': error_msg}), 400
@@ -734,29 +808,50 @@ def get_file_info_route():
         error_msg = language_resources.get(ui_lang_code, {}).get("error_no_file_selected", "No file selected.")
         return jsonify({'error': error_msg}), 400
 
+    # [!INFO] --- 여기서부터 로직이 크게 개선됩니다 ---
     if file and allowed_file(file.filename):
-        original_filename = secure_filename(file.filename)
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_%f') # 밀리초까지 추가하여 유니크 확보
-        # 저장될 파일명 (한글 등 유니코드 문제 방지 위해 secure_filename 한번 더 또는 UUID 사용)
-        # 여기서는 타임스탬프와 원본 파일명을 조합하되, 최종 secure_filename 처리
-        server_filename = secure_filename(f"{timestamp}_{original_filename}")
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], server_filename)
-        
         try:
+            # 1. 원본 파일명에서 이름과 확장자를 먼저 분리합니다.
+            original_basename, file_extension_with_dot = os.path.splitext(file.filename)
+            file_extension = file_extension_with_dot[1:].lower() # '.' 제거
+
+            # 2. 순수 파일 이름 부분만 secure_filename으로 처리합니다.
+            safe_basename = secure_filename(original_basename)
+            
+            # 3. 안전한 파일명과 원본 확장자를 조합하여 서버에 저장될 파일명을 만듭니다.
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_%f')
+            # 저장될 최종 파일명: 타임스탬프 + 안전한 파일명 + 원본 확장자
+            server_filename = f"{timestamp}_{safe_basename}{file_extension_with_dot}"
+            filepath = os.path.join(app.config['UPLOAD_FOLDER'], server_filename)
+
             file.save(filepath)
-            info = pptx_handler.get_file_info(filepath)
-            if "error" in info: # pptx_handler에서 오류 반환 시
+            
+            # 4. 파일 정보 분석
+            info = {}
+            if file_extension == 'pptx':
+                info = pptx_handler.get_file_info(filepath)
+            elif file_extension == 'xlsx':
+                info = excel_handler.get_file_info(filepath)
+            else:
+                raise ValueError("지원하지 않는 파일 형식입니다.")
+
+            if "error" in info and info["error"]:
                  raise Exception(info["error"])
 
-            return jsonify({'filename': original_filename, 'filepath': filepath, 'info': info })
+            # 5. 프론트엔드에는 원본 파일명을 보여줍니다.
+            return jsonify({'filename': file.filename, 'filepath': filepath, 'info': info })
+        
         except Exception as e:
-            if os.path.exists(filepath): # 오류 발생 시 저장된 파일 삭제
+            # 오류 처리 로직은 기존과 동일
+            if 'filepath' in locals() and os.path.exists(filepath):
                 try: os.remove(filepath)
                 except Exception as e_remove: logger.error(f"Error removing uploaded file on failure: {e_remove}")
-            logger.error(f"Error processing file info for {original_filename}: {e}", exc_info=True)
+            
+            logger.error(f"Error processing file info for {file.filename}: {e}", exc_info=True)
             error_msg = language_resources.get(ui_lang_code, {}).get("error_file_processing_failed", "Failed to process file.")
             return jsonify({'error': error_msg, 'details': str(e)}), 500
     
+    # allowed_file에서 False가 반환된 경우
     error_msg = language_resources.get(ui_lang_code, {}).get("error_invalid_file_type", "Invalid file type.")
     return jsonify({'error': error_msg}), 400
 

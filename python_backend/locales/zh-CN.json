@@ -3,7 +3,7 @@
     "status_label": "状态",
     "status_checking": "检查中...",
     "file_select_title": "选择文件",
-    "file_upload_label": "选择或拖放PowerPoint文件至此",
+    "file_upload_label": "选择或拖放PowerPoint,excel文件至此",
     "file_info_title": "文件信息",
     "file_name_label": "文件名:",
     "slide_count_label": "幻灯片:",
