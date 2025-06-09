@@ -328,19 +328,20 @@ ipcMain.handle('open-log-folder', async () => {
     return { success: false, message: `로그 디렉토리를 찾을 수 없습니다: ${LOGS_DIR}` };
 });
 
-ipcMain.handle('save-translated-file', async (event, { tempFilePath, originalPath }) => {
-    if (!tempFilePath || !originalPath) {
-        return { success: false, message: '파일 경로 정보가 누락되었습니다.' };
+ipcMain.handle('save-translated-file', async (event, { tempFilePath, originalPath, targetLang }) => {
+    if (!tempFilePath || !originalPath || !targetLang) {
+        return { success: false, message: '파일 경로 또는 대상 언어 정보가 누락되었습니다.' };
     }
 
-    const originalFileName = path.basename(originalPath);
     const originalFolder = path.dirname(originalPath);
-    const translatedFileName = path.basename(tempFilePath);
+    const { name, ext } = path.parse(originalPath); // 예: name="원본프레젠테이션", ext=".pptx"
+    const newFileName = `${name}_${targetLang}${ext}`; // 예: "원본프레젠테이션_ko.pptx"
+
 
     try {
         const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, {
             title: '번역된 파일 저장',
-            defaultPath: path.join(originalFolder, translatedFileName),
+            defaultPath: path.join(originalFolder, newFileName), // 새로 생성한 파일명을 기본값으로 사용
             filters: [
                 { name: 'PowerPoint or Excel', extensions: ['pptx', 'xlsx'] },
                 { name: 'All Files', extensions: ['*'] }
