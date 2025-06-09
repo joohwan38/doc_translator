@@ -1,6 +1,6 @@
 {
     "name": "document-translator",
-    "version": "1.7.1",
+    "version": "1.8.0",
     "description": "PowerPoint Document Translator using Ollama and Electron",
     "main": "main.js",
     "scripts": {
