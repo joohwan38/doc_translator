@@ -121,10 +121,6 @@ ollama pull gemma3
 이 프로젝트는 라인스튜디오 라이선스 하에 배포됩니다. 저작권자의 허가가 없는 무단 복제 사용을 금지합니다.
 
 
-## 📞 버그리포트 및 문의
-- Email: joohwan.son@linecorp.com
-- Website: https://linestudio.com
-
 ---
 <div align="center">
   Made with ❤️ by LINE Studio
