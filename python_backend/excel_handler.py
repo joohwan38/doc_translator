@@ -75,29 +75,52 @@ class ExcelHandler(AbsExcelProcessor):
                            stop_event: Optional[Any] = None) -> Optional[str]:
         temp_input_path = None
         try:
-            # 1. 원본 파일을 임시 파일로 복사하여 작업 (읽기/쓰기 동시 수행 위함)
-            temp_input_path = os.path.join(os.path.dirname(output_path), f"temp_{os.path.basename(file_path)}")
-            shutil.copy2(file_path, temp_input_path)
-
-            workbook = openpyxl.load_workbook(temp_input_path)
-            
-            # 2. 번역할 텍스트 추출 (병합 셀 고려)
+            # 1. 번역할 텍스트 추출 (읽기 전용으로 먼저 시도)
             texts_to_translate = []
-            cell_map = [] # (sheet_name, cell_coordinate)
-            merged_cell_ranges_map = {sheet.title: [str(merged_range) for merged_range in sheet.merged_cells.ranges] for sheet in workbook.worksheets}
+            cell_map = []
+            merged_cell_ranges_map = {}
+            
+            try:
+                # 드로잉 요소 문제 없는 대부분의 파일을 위해 읽기/쓰기 모드로 먼저 시도
+                temp_input_path = os.path.join(os.path.dirname(output_path), f"temp_readwrite_{os.path.basename(file_path)}")
+                shutil.copy2(file_path, temp_input_path)
+                workbook = openpyxl.load_workbook(temp_input_path)
+                is_read_only_fallback = False
+            except KeyError as ke:
+                if "There is no item named 'xl/drawings/NULL'" in str(ke):
+                    logger.warning(f"드로잉 요소 문제로 일반 로드 실패. 읽기 전용 모드로 재시도합니다: {ke}")
+                    if temp_input_path and os.path.exists(temp_input_path): os.remove(temp_input_path)
+                    workbook = openpyxl.load_workbook(file_path, read_only=True, data_only=True)
+                    is_read_only_fallback = True
+                else:
+                    raise # 다른 KeyError는 다시 발생시킴
 
-            for sheet_name in workbook.sheetnames:
-                sheet = workbook[sheet_name]
+            for sheet in workbook.worksheets:
+                sheet_name = sheet.title
+                # 읽기 전용 모드에서는 merged_cells가 제대로 동작하지 않을 수 있으므로 예외 처리
+                try:
+                    merged_cell_ranges_map[sheet_name] = [str(merged_range) for merged_range in sheet.merged_cells.ranges]
+                except Exception:
+                    merged_cell_ranges_map[sheet_name] = []
+
                 merged_cells_in_sheet = set()
                 for merged_range in merged_cell_ranges_map.get(sheet_name, []):
-                    for row in sheet[merged_range]:
-                        for cell in row:
-                            merged_cells_in_sheet.add(cell.coordinate)
+                    # iter_rows, iter_cols 등은 읽기 전용에서만 사용 가능할 수 있음
+                    min_col, min_row, max_col, max_row = openpyxl.utils.range_boundaries(merged_range)
+                    for row in range(min_row, max_row + 1):
+                        for col in range(min_col, max_col + 1):
+                            merged_cells_in_sheet.add(openpyxl.utils.get_column_letter(col) + str(row))
 
                 for row in sheet.iter_rows():
                     for cell in row:
-                        if cell.coordinate in merged_cells_in_sheet and not any(cell.coordinate in r for r in sheet.merged_cells.ranges if sheet[r.split(':')[0]].coordinate == cell.coordinate):
-                            continue # 병합된 셀의 첫번째 셀이 아니면 건너뛰기
+                        # 병합된 셀의 첫번째가 아니면 건너뛰기 (병합 정보가 정확할 때만 유효)
+                        if cell.coordinate in merged_cells_in_sheet:
+                            is_start_cell = False
+                            for r in merged_cell_ranges_map.get(sheet_name, []):
+                                if cell.coordinate == r.split(':')[0]:
+                                    is_start_cell = True
+                                    break
+                            if not is_start_cell: continue
 
                         if cell.value and isinstance(cell.value, str) and cell.value.strip():
                             texts_to_translate.append(cell.value)
@@ -108,66 +131,75 @@ class ExcelHandler(AbsExcelProcessor):
                 shutil.copy2(file_path, output_path)
                 return output_path
 
-            # 3. 텍스트 일괄 번역
-            if progress_callback:
-                progress_callback("Excel", "status_task_translating_cells", 0, f"Translating {len(texts_to_translate)} cells...")
-
+            # 2. 텍스트 일괄 번역
+            if progress_callback: progress_callback("Excel", "status_task_translating_cells", 0, f"Translating {len(texts_to_translate)} cells...")
             translated_texts = translator.translate_texts(
-                texts_to_translate, src_lang_ui_name, tgt_lang_ui_name,
-                model_name, ollama_service, stop_event=stop_event,
-                progress_callback=progress_callback,
-                base_location_key="status_key_excel_file",
-                base_task_key="status_task_translating_cells"
+                texts_to_translate, src_lang_ui_name, tgt_lang_ui_name, model_name, ollama_service, 
+                stop_event=stop_event, progress_callback=progress_callback,
+                base_location_key="status_key_excel_file", base_task_key="status_task_translating_cells"
             )
 
-            if stop_event and stop_event.is_set():
-                logger.info("엑셀 번역 작업이 중단되었습니다.")
-                # 중단 시 현재까지 번역된 내용으로 저장 시도
-                # ... (중단 시 저장 로직은 아래에서 통합)
-
-            if len(texts_to_translate) != len(translated_texts):
-                logger.error("원본 텍스트와 번역된 텍스트의 개수가 일치하지 않습니다.")
-                return None
+            if stop_event and stop_event.is_set(): logger.info("엑셀 번역 작업이 중단되었습니다.")
+            if len(texts_to_translate) != len(translated_texts): raise ValueError("번역된 텍스트와 원본 텍스트의 개수가 불일치합니다.")
 
             translated_map = {cell_map[i]: translated_texts[i] for i in range(len(translated_texts))}
 
-            # 4. 번역된 내용을 워크북에 직접 쓰기
-            weight_per_cell = config.WEIGHT_EXCEL_CELL if hasattr(config, 'WEIGHT_EXCEL_CELL') else 1
-            for sheet_name in workbook.sheetnames:
-                if stop_event and stop_event.is_set(): break
-                sheet = workbook[sheet_name]
-                for row in sheet.iter_rows():
-                    if stop_event and stop_event.is_set(): break
-                    for cell in row:
-                        if (sheet_name, cell.coordinate) in translated_map:
-                            translated_text = translated_map[(sheet_name, cell.coordinate)]
-                            if "오류:" not in translated_text:
-                                cell.value = translated_text
-                            
-                            if progress_callback:
-                                progress_callback(
-                                    f"Sheet: {sheet_name}", 
-                                    "Applying translation",
-                                    weight_per_cell,
-                                    f"Cell {cell.coordinate}"
-                                )
-            
-            workbook.save(output_path)
+            # 3. 번역된 내용을 워크북에 쓰기
+            if is_read_only_fallback:
+                # 읽기 전용 모드였으면, 새 워크북을 만들어 내용을 복사 (재조립)
+                logger.info("읽기 전용 폴백 모드: 새 워크북을 생성하여 내용을 재조립합니다.")
+                new_workbook = openpyxl.Workbook()
+                # 기본 시트 제거
+                if "Sheet" in new_workbook.sheetnames and len(new_workbook.sheetnames) == 1:
+                    new_workbook.remove(new_workbook.active)
+
+                for sheet_name in workbook.sheetnames:
+                    source_sheet = workbook[sheet_name]
+                    target_sheet = new_workbook.create_sheet(title=sheet_name)
+
+                    # 셀 값 및 스타일 복사
+                    for row in source_sheet.iter_rows():
+                        for cell in row:
+                            new_cell = target_sheet.cell(row=cell.row, column=cell.column)
+                            if (sheet_name, cell.coordinate) in translated_map:
+                                translated_text = translated_map[(sheet_name, cell.coordinate)]
+                                if "오류:" not in translated_text:
+                                    new_cell.value = translated_text
+                                else:
+                                    new_cell.value = cell.value # 오류 시 원본 값 유지
+                            else:
+                                new_cell.value = cell.value
+                            copy_cell_style(cell, new_cell)
+                    
+                    # 병합 정보 복사
+                    if sheet_name in merged_cell_ranges_map:
+                        for merged_range in merged_cell_ranges_map[sheet_name]:
+                            target_sheet.merge_cells(merged_range)
+                
+                new_workbook.save(output_path)
+
+            else:
+                # 일반 모드였으면, 기존 워크북에 직접 수정 후 저장
+                workbook_to_save = workbook
+                for sheet_name in workbook_to_save.sheetnames:
+                    sheet = workbook_to_save[sheet_name]
+                    for row in sheet.iter_rows():
+                        for cell in row:
+                            if (sheet_name, cell.coordinate) in translated_map:
+                                translated_text = translated_map[(sheet_name, cell.coordinate)]
+                                if "오류:" not in translated_text:
+                                    cell.value = translated_text
+                workbook_to_save.save(output_path)
+
             logger.info(f"번역된 엑셀 파일 저장 완료: {output_path}")
             return output_path
 
-        except KeyError as ke:
-            # 'xl/drawings/NULL'과 같은 특정 KeyError를 처리
-            if "xl/drawings/NULL" in str(ke):
-                logger.error(f"엑셀 파일 번역 중 오류: 파일 내 드로잉 요소 문제로 로드 실패. 다른 엑셀 파일을 시도하거나, 파일에서 드로잉 요소를 제거 후 다시 시도해주세요. 오류: {ke}", exc_info=True)
-            else:
-                logger.error(f"엑셀 파일 번역 중 알 수 없는 KeyError 발생: {ke}", exc_info=True)
+        except Exception as e:
+            logger.error(f"엑셀 파일 번역 중 최종 오류: {e}", exc_info=True)
             return None
         finally:
             if temp_input_path and os.path.exists(temp_input_path):
-                try:
-                    os.remove(temp_input_path)
-                except OSError as e:
-                    logger.warning(f"임시 엑셀 파일 삭제 실패: {e}")
+                try: os.remove(temp_input_path)
+                except OSError as e: logger.warning(f"임시 엑셀 파일 삭제 실패: {e}")
 
     
