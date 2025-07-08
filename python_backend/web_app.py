@@ -13,6 +13,7 @@ import time
 import traceback
 from functools import wraps
 import logging # 로깅 모듈 추가
+import logging.handlers # Add this import
 import atexit
 from typing import Optional, Dict, Any, List, Tuple, Callable # Optional 및 다른 필요한 타입 힌트 추가
 import sys
@@ -39,8 +40,38 @@ app = Flask(__name__, template_folder='templates', static_folder='static')
 
 CORS(app)
 
+# --- 로깅 설정 ---
+def setup_logging(app_instance):
+    log_dir = config.LOGS_DIR
+    os.makedirs(log_dir, exist_ok=True)
+
+    log_file_path = os.path.join(log_dir, 'app.log')
+    
+    # 기본 로거 가져오기
+    root_logger = logging.getLogger()
+    root_logger.setLevel(config.DEBUG_LOG_LEVEL if app_instance.debug else config.DEFAULT_LOG_LEVEL)
+
+    # 기존 핸들러 제거 (중복 로깅 방지)
+    for handler in root_logger.handlers[:]:
+        root_logger.removeHandler(handler)
+
+    # 파일 핸들러 추가 (매일 자정에 롤오버)
+    file_handler = logging.handlers.TimedRotatingFileHandler(
+        log_file_path, when='midnight', interval=1, backupCount=7, encoding='utf-8'
+    )
+    file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+    root_logger.addHandler(file_handler)
+
+    # 콘솔 핸들러 추가 (개발 중에는 콘솔에도 출력)
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+    root_logger.addHandler(console_handler)
+
+    logger.info(f"Logging initialized. Logs will be saved to {log_file_path}")
+
 # --- 설정 로드 및 UPLOAD_FOLDER 설정 ---
 app.config.from_object(config) # config.py의 설정들을 Flask app config로 로드
+setup_logging(app) # 로깅 설정 함수 호출
 # UPLOAD_FOLDER가 config.py에 정의되어 있으므로 app.config['UPLOAD_FOLDER']로 사용
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True) # 업로드 폴더 생성
 app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100MB (config.py로 이동 가능)

@@ -100,89 +100,102 @@ class OllamaTranslator(AbsTranslator):
             # 오류 발생 시 캐시에 저장하지 않음
             return f"오류: {error} - \"{text_snippet}\""
 
-    def translate_texts_batch(self, texts_to_translate: List[str], src_lang_ui_name: str, tgt_lang_ui_name: str,
-                              model_name: str, ollama_service_instance: AbsOllamaService,
-                              is_ocr_text: bool = False, ocr_temperature: Optional[float] = None,
-                              stop_event: Optional[threading.Event] = None) -> List[str]:
-
+    def translate_texts(self, texts_to_translate: List[str], src_lang_ui_name: str, tgt_lang_ui_name: str,
+                        model_name: str, ollama_service_instance: AbsOllamaService,
+                        is_ocr_text: bool = False, ocr_temperature: Optional[float] = None,
+                        stop_event: Optional[threading.Event] = None,
+                        progress_callback: Optional[Callable[[str, str, float, str], None]] = None,
+                        base_location_key: str = "status_key_translating",
+                        base_task_key: str = "status_task_translating_text") -> List[str]:
         if not texts_to_translate:
             return []
 
         translated_results = [""] * len(texts_to_translate)
-        tasks_to_process_indices: List[int] = [] # 실제 번역이 필요한 항목의 인덱스 저장
+        tasks_to_process_indices: List[int] = []
 
         for i, text in enumerate(texts_to_translate):
-            if stop_event and stop_event.is_set(): # 중단 요청 확인
-                # 현재까지 번역된 결과와 원본 텍스트로 나머지 채우기
-                for j in range(len(texts_to_translate)):
-                    if not translated_results[j]: # 아직 결과가 없는 경우
-                        translated_results[j] = texts_to_translate[j] # 원본으로 채움
+            if stop_event and stop_event.is_set():
+                for j in range(len(texts_to_translate)): translated_results[j] = texts_to_translate[j]
                 return translated_results
 
             if not text or not text.strip():
                 translated_results[i] = text if text else ""
+                if progress_callback:
+                    progress_callback(base_location_key, "status_task_skipping_empty_text", 0, "")
                 continue
 
             cache_key = self._get_cache_key(text, src_lang_ui_name, tgt_lang_ui_name, model_name)
             with self.cache_lock:
                 if cache_key in self.translation_cache:
-                    self.translation_cache.move_to_end(cache_key) # 캐시 히트 시 LRU 업데이트
+                    self.translation_cache.move_to_end(cache_key)
                     translated_results[i] = self.translation_cache[cache_key]
+                    if progress_callback:
+                        work_done = len(text) * config.WEIGHT_TEXT_CHAR
+                        snippet = translated_results[i][:30].replace('\n', ' ') + "..."
+                        progress_callback(base_location_key, "status_task_using_cache", work_done, snippet)
                 else:
-                    tasks_to_process_indices.append(i) # 번역 필요한 인덱스 추가
+                    tasks_to_process_indices.append(i)
 
-        if not tasks_to_process_indices: # 모든 텍스트가 캐시된 경우
+        if not tasks_to_process_indices:
             return translated_results
 
-        # 실제 번역이 필요한 텍스트만 추출
         actual_texts_to_translate_api = [texts_to_translate[i] for i in tasks_to_process_indices]
-        
-        # 병렬 처리 설정
         num_workers = min(config.MAX_TRANSLATION_WORKERS, len(actual_texts_to_translate_api))
-        if num_workers == 0 : # 번역할 것이 없는 경우 (이론상 위에서 걸러짐)
-             return translated_results
+        if num_workers == 0:
+            return translated_results
 
         with ThreadPoolExecutor(max_workers=num_workers) as executor:
-            future_to_original_index: Dict[Any, int] = {}
-
-            for i, text_idx in enumerate(tasks_to_process_indices):
-                if stop_event and stop_event.is_set():
-                    break # 새 작업 제출 중단
-
-                text_content = texts_to_translate[text_idx]
-                future = executor.submit(
-                    self.translate_text, # 개별 translate_text 호출 (내부적으로 캐시 처리)
-                    text_content,
-                    src_lang_ui_name,
-                    tgt_lang_ui_name,
-                    model_name,
-                    ollama_service_instance,
-                    is_ocr_text,
-                    ocr_temperature
-                )
-                future_to_original_index[future] = text_idx # Future 객체와 원본 리스트의 인덱스 매핑
+            future_to_original_index = {
+                executor.submit(
+                    self.translate_text, texts_to_translate[text_idx], src_lang_ui_name, tgt_lang_ui_name,
+                    model_name, ollama_service_instance, is_ocr_text, ocr_temperature
+                ): text_idx
+                for text_idx in tasks_to_process_indices
+                if not (stop_event and stop_event.is_set())
+            }
 
             for future in as_completed(future_to_original_index):
                 original_idx = future_to_original_index[future]
-                if stop_event and stop_event.is_set() and not translated_results[original_idx]: # 이미 처리된건 놔둠
-                     translated_results[original_idx] = texts_to_translate[original_idx] # 중단 시 원본으로
-                     continue
+                original_text = texts_to_translate[original_idx]
+
+                if stop_event and stop_event.is_set():
+                    if not translated_results[original_idx]:
+                        translated_results[original_idx] = original_text
+                    continue
 
                 try:
                     result = future.result()
                     translated_results[original_idx] = result
+                    if progress_callback:
+                        work_done = len(original_text) * config.WEIGHT_TEXT_CHAR
+                        snippet = result[:30].replace('\n', ' ') + "..."
+                        progress_callback(base_location_key, base_task_key, work_done, snippet)
                 except Exception as e:
-                    logger.error(f"배치 번역 중 인덱스 {original_idx} 처리 오류: {e}")
-                    text_snippet = texts_to_translate[original_idx][:20].replace('\n', ' ') + "..."
-                    translated_results[original_idx] = f"오류: 배치 처리 중 예외 - \"{text_snippet}\""
-        
-        # 모든 작업 완료 후, 중단 요청으로 인해 처리되지 못한 항목이 있다면 원본으로 채우기
+                    logger.error(f"Batch translation error at index {original_idx}: {e}")
+                    text_snippet = original_text[:20].replace('\n', ' ') + "..."
+                    error_message = f"Error: Exception in batch processing - \"{text_snippet}\""
+                    translated_results[original_idx] = error_message
+                    if progress_callback:
+                        work_done = len(original_text) * config.WEIGHT_TEXT_CHAR
+                        progress_callback(base_location_key, "status_task_error", work_done, error_message)
+
         if stop_event and stop_event.is_set():
             for i in range(len(texts_to_translate)):
-                if not translated_results[i]: # 아직 결과가 없는 경우
+                if not translated_results[i]:
                     translated_results[i] = texts_to_translate[i]
 
         return translated_results
+
+    def translate_texts_batch(self, texts_to_translate: List[str], src_lang_ui_name: str, tgt_lang_ui_name: str,
+                              model_name: str, ollama_service_instance: AbsOllamaService,
+                              is_ocr_text: bool = False, ocr_temperature: Optional[float] = None,
+                              stop_event: Optional[threading.Event] = None) -> List[str]:
+        # This method now simply calls the new translate_texts method for backward compatibility.
+        return self.translate_texts(
+            texts_to_translate, src_lang_ui_name, tgt_lang_ui_name, model_name,
+            ollama_service_instance, is_ocr_text, ocr_temperature, stop_event,
+            progress_callback=None # No progress callback in the old batch method
+        )
 
 
     def clear_translation_cache(self):

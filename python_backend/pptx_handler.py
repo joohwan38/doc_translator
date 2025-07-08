@@ -585,9 +585,12 @@ class PptxHandler(AbsPptxProcessor):
 
             if texts_for_batch_translation:
                 if log_func_s1: log_func_s1(f"일반 텍스트 {len(texts_for_batch_translation)}개 일괄 번역 시작...")
-                translated_texts_batch = translator.translate_texts_batch(
+                translated_texts_batch = translator.translate_texts(
                     texts_for_batch_translation, src_lang_ui_name, tgt_lang_ui_name,
-                    model_name, ollama_service, is_ocr_text=False, stop_event=stop_event
+                    model_name, ollama_service, is_ocr_text=False, stop_event=stop_event,
+                    progress_callback=progress_callback_item_completed,
+                    base_location_key="status_key_translating_text_elements", # UI에 표시될 위치 키
+                    base_task_key="status_task_translating_text" # UI에 표시될 작업 키
                 )
                 if stop_event and stop_event.is_set():
                     if f_task_log_s1 and not f_task_log_s1.closed: f_task_log_s1.close()
@@ -606,9 +609,6 @@ class PptxHandler(AbsPptxProcessor):
                 slide_idx_job = context['slide_idx']
                 item_name_for_log_job = context['name']
                 item_type_internal_job = context['item_type_internal']
-                ui_feedback_task_type = "텍스트/표 적용"
-                if item_type_internal_job == 'text_shape': ui_feedback_task_type = "텍스트 요소 적용"
-                elif item_type_internal_job == 'table_cell': ui_feedback_task_type = "표 셀 내용 적용"
                 
                 text_frame_to_process: Optional[Any] = None
                 if item_type_internal_job == 'text_shape':
@@ -664,14 +664,15 @@ class PptxHandler(AbsPptxProcessor):
                             log_func_s1
                         )
                 
-                if progress_callback_item_completed and not (stop_event and stop_event.is_set()):
-                    progress_text_snippet = translated_text_for_job.strip().replace(chr(10), ' ')[:30] if "오류:" not in translated_text_for_job else job_data['original_text'].strip().replace(chr(10), ' ')[:30]
-                    progress_callback_item_completed(
-                        f"슬라이드 {slide_idx_job + 1}",
-                        ui_feedback_task_type,
-                        float(job_data['char_count'] * config.WEIGHT_TEXT_CHAR), 
-                        progress_text_snippet
-                    )
+                # This progress callback is now handled inside translator.translate_texts
+                # if progress_callback_item_completed and not (stop_event and stop_event.is_set()):
+                #     progress_text_snippet = translated_text_for_job.strip().replace(chr(10), ' ')[:30] if "오류:" not in translated_text_for_job else job_data['original_text'].strip().replace(chr(10), ' ')[:30]
+                #     progress_callback_item_completed(
+                #         f"슬라이드 {slide_idx_job + 1}",
+                #         ui_feedback_task_type,
+                #         float(job_data['char_count'] * config.WEIGHT_TEXT_CHAR), 
+                #         progress_text_snippet
+                #     )
             
             if stop_event and stop_event.is_set(): # 일괄 번역 적용 후 중단 체크
                 if f_task_log_s1 and not f_task_log_s1.closed: f_task_log_s1.close()
@@ -763,10 +764,13 @@ class PptxHandler(AbsPptxProcessor):
                                         if progress_callback_item_completed and not (stop_event and stop_event.is_set()):
                                             progress_callback_item_completed(ocr_feedback_location, "ocr_status_translating_texts_start", 0, f"'{item_name_ocr_log}' ({len(ocr_texts_for_translation)}개) 번역 시작")
                                         
-                                        translated_ocr_texts = translator.translate_texts_batch(
+                                        translated_ocr_texts = translator.translate_texts(
                                             ocr_texts_for_translation, src_lang_ui_name, tgt_lang_ui_name,
                                             model_name, ollama_service, is_ocr_text=True,
-                                            ocr_temperature=ocr_temperature, stop_event=stop_event
+                                            ocr_temperature=ocr_temperature, stop_event=stop_event,
+                                            progress_callback=progress_callback_item_completed,
+                                            base_location_key=f"status_key_translating_images_slide_{slide_idx_ocr + 1}",
+                                            base_task_key="status_task_translating_ocr_text"
                                         )
                                         if stop_event and stop_event.is_set():
                                             if f_task_log_s1 and not f_task_log_s1.closed: f_task_log_s1.close()

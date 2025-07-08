@@ -35,7 +35,7 @@ class ExcelHandler(AbsExcelProcessor):
         }
         try:
             print("[DEBUG] excel_handler.py: openpyxl.load_workbook 호출 직전") # [!INFO] 디버깅 print 2
-            workbook = openpyxl.load_workbook(file_path, read_only=True)
+            workbook = openpyxl.load_workbook(file_path, read_only=True, data_only=True, keep_vba=False)
             print("[DEBUG] excel_handler.py: 워크북 로드 성공") # [!INFO] 디버깅 print 3
 
             info["sheet_count"] = len(workbook.sheetnames)
@@ -73,7 +73,7 @@ class ExcelHandler(AbsExcelProcessor):
                            stop_event: Optional[Any] = None) -> Optional[str]:
         """워크북의 모든 텍스트를 번역하고 새 파일로 저장합니다."""
         try:
-            original_workbook = openpyxl.load_workbook(file_path)
+            original_workbook = openpyxl.load_workbook(file_path, read_only=True, data_only=True, keep_vba=False)
             
             # 1. 번역할 텍스트 추출
             texts_to_translate = []
@@ -93,11 +93,14 @@ class ExcelHandler(AbsExcelProcessor):
 
             # 2. 텍스트 일괄 번역 (기존 번역기 재사용)
             if progress_callback:
-                progress_callback("Excel", "Translating Cells", 0, f"Translating {len(texts_to_translate)} cells...")
+                progress_callback("Excel", "status_task_translating_cells", 0, f"Translating {len(texts_to_translate)} cells...")
 
-            translated_texts = translator.translate_texts_batch(
+            translated_texts = translator.translate_texts(
                 texts_to_translate, src_lang_ui_name, tgt_lang_ui_name,
-                model_name, ollama_service, stop_event=stop_event
+                model_name, ollama_service, stop_event=stop_event,
+                progress_callback=progress_callback,
+                base_location_key="status_key_excel_file",
+                base_task_key="status_task_translating_cells"
             )
 
             if stop_event and stop_event.is_set():
@@ -118,6 +121,13 @@ class ExcelHandler(AbsExcelProcessor):
 
             return output_path
 
+        except KeyError as ke:
+            # 'xl/drawings/NULL'과 같은 특정 KeyError를 처리
+            if "xl/drawings/NULL" in str(ke):
+                logger.error(f"엑셀 파일 번역 중 오류: 파일 내 드로잉 요소 문제로 로드 실패. 다른 엑셀 파일을 시도하거나, 파일에서 드로잉 요소를 제거 후 다시 시도해주세요. 오류: {ke}", exc_info=True)
+            else:
+                logger.error(f"엑셀 파일 번역 중 알 수 없는 KeyError 발생: {ke}", exc_info=True)
+            return None
         except Exception as e:
             logger.error(f"엑셀 파일 번역 중 오류: {e}", exc_info=True)
             return None

@@ -120,7 +120,13 @@ class ChartXmlHandler(AbsChartProcessor):
 
                 if texts_list_for_batch:
                     if log_func: log_func(f"차트 내 고유 텍스트 {len(texts_list_for_batch)}개 일괄 번역 시작...")
-                    translated_texts_batch = self.translator.translate_texts_batch(texts_list_for_batch, src_lang_ui_name, tgt_lang_ui_name, model_name, self.ollama_service, is_ocr_text=False, stop_event=stop_event)
+                    translated_texts_batch = self.translator.translate_texts(
+                        texts_list_for_batch, src_lang_ui_name, tgt_lang_ui_name, model_name, 
+                        self.ollama_service, is_ocr_text=False, stop_event=stop_event,
+                        progress_callback=progress_callback_item_completed,
+                        base_location_key="status_key_chart_translation",
+                        base_task_key="status_task_translating_chart_text"
+                    )
                     if stop_event and stop_event.is_set(): # ... (중단 처리)
                         if log_func: log_func("차트 텍스트 일괄 번역 중 중단."); return None
                         return None
