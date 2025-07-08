@@ -209,11 +209,12 @@ class ChartXmlHandler(AbsChartProcessor):
 
                 with zipfile.ZipFile(output_path, 'w', zipfile.ZIP_DEFLATED) as zip_out:
                     # ... (Zip 파일 재작성 로직은 기존과 동일) ...
-                    for item_name_in_zip in zip_ref.namelist():
-                        if item_name_in_zip in modified_charts_data:
-                            zip_out.writestr(item_name_in_zip, modified_charts_data[item_name_in_zip])
-                        else:
-                            zip_out.writestr(item_name_in_zip, zip_ref.read(item_name_in_zip))
+                    with zipfile.ZipFile(pptx_path, 'r') as zip_ref:
+                        for item_name_in_zip in zip_ref.namelist():
+                            if item_name_in_zip in modified_charts_data:
+                                zip_out.writestr(item_name_in_zip, modified_charts_data[item_name_in_zip])
+                            else:
+                                zip_out.writestr(item_name_in_zip, zip_ref.read(item_name_in_zip))
 
 
             if log_func: log_func(f"\nPPTX 차트 XML 번역 완료! 최종 파일: {output_path}")
@@ -229,4 +230,3 @@ class ChartXmlHandler(AbsChartProcessor):
             if f_task_log_chart_local and not f_task_log_chart_local.closed:
                 try: f_task_log_chart_local.close()
                 except Exception: pass
-
