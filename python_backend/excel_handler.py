@@ -1,5 +1,6 @@
 # python_backend/excel_handler.py
 import openpyxl
+import os
 from openpyxl.cell import Cell
 from openpyxl.styles import Font, PatternFill, Border, Alignment, Side, Protection
 from copy import copy
