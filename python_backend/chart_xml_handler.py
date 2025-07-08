@@ -47,7 +47,7 @@ class ChartXmlHandler(AbsChartProcessor):
                                  model_name: str, output_path: str = None,
                                  progress_callback_item_completed: Optional[Callable[[Any, str, float, str], None]] = None, # Changed int to float
                                  stop_event: Optional[Any] = None,
-                                 task_log_filepath: Optional[str] = None) -> Optional[str>:
+                                 task_log_filepath: Optional[str] = None) -> Optional[str]:
 
         if output_path is None:
             base_name = os.path.splitext(pptx_path)[0]

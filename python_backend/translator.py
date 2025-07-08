@@ -19,13 +19,15 @@ DEFAULT_MAX_CACHE_SIZE = 1000
 
 
 class OllamaTranslator(AbsTranslator):
-    def __init__(self, max_cache_size: Optional[int] = None):
+    def __init__(self, max_cache_size: Optional[int] = None, max_workers: Optional[int] = None):
         # OrderedDict를 사용하여 간단한 FIFO 캐시 구현
         self.max_cache_size = max_cache_size if max_cache_size is not None \
                               else getattr(config, 'MAX_TRANSLATION_CACHE_SIZE', DEFAULT_MAX_CACHE_SIZE)
         self.translation_cache: OrderedDict[str, str] = OrderedDict()
         self.cache_lock = threading.Lock()
-        logger.info(f"OllamaTranslator 초기화됨. 번역 캐시 최대 크기: {self.max_cache_size}")
+        # max_workers 설정 (기본값은 config.py에서 가져오거나 4로 설정)
+        self.max_workers = max_workers if max_workers is not None else getattr(config, 'MAX_TRANSLATION_WORKERS', 4)
+        logger.info(f"OllamaTranslator 초기화됨. 번역 캐시 최대 크기: {self.max_cache_size}, 최대 작업자 수: {self.max_workers}")
 
     def _get_cache_key(self, text_to_translate: str, src_lang_ui_name: str, tgt_lang_ui_name: str, model_name: str) -> str:
         key_string = f"{src_lang_ui_name}|{tgt_lang_ui_name}|{model_name}|{text_to_translate}"
@@ -84,7 +86,7 @@ class OllamaTranslator(AbsTranslator):
                 return self.translation_cache[cache_key]
 
         prompt = self._create_prompt(text_to_translate, src_lang_ui_name, tgt_lang_ui_name)
-        temperature = ocr_temperature if is_ocr_text and ocr_temperature else config.TRANSLATOR_TEMPERATURE_GENERAL
+        temperature = ocr_temperature if is_ocr_text and ocr_temperature else config.DEFAULT_ADVANCED_SETTINGS['ocr_temperature']
 
         result, error = self._call_ollama_api(prompt, model_name, temperature, ollama_service_instance)
 
@@ -140,7 +142,7 @@ class OllamaTranslator(AbsTranslator):
             return translated_results
 
         actual_texts_to_translate_api = [texts_to_translate[i] for i in tasks_to_process_indices]
-        num_workers = min(config.MAX_TRANSLATION_WORKERS, len(actual_texts_to_translate_api))
+        num_workers = min(self.max_workers, len(actual_texts_to_translate_api))
         if num_workers == 0:
             return translated_results
 

@@ -40,6 +40,31 @@ app = Flask(__name__, template_folder='templates', static_folder='static')
 
 CORS(app)
 
+# 사용자 설정 파일 경로
+USER_SETTINGS_FILE = os.path.join(config.APP_DATA_DIR, config.USER_SETTINGS_FILENAME)
+
+def load_user_settings():
+    settings = config.DEFAULT_ADVANCED_SETTINGS.copy()
+    if os.path.exists(USER_SETTINGS_FILE):
+        try:
+            with open(USER_SETTINGS_FILE, 'r', encoding='utf-8') as f:
+                user_saved_settings = json.load(f)
+                settings.update(user_saved_settings)
+        except Exception as e:
+            logger.error(f"Error loading user settings: {e}")
+    return settings
+
+def save_user_settings(settings):
+    os.makedirs(config.APP_DATA_DIR, exist_ok=True)
+    try:
+        with open(USER_SETTINGS_FILE, 'w', encoding='utf-8') as f:
+            json.dump(settings, f, ensure_ascii=False, indent=4)
+    except Exception as e:
+        logger.error(f"Error saving user settings: {e}")
+
+# 앱 시작 시 사용자 설정 로드
+app.config['USER_SETTINGS'] = load_user_settings()
+
 # --- 로깅 설정 ---
 def setup_logging(app_instance):
     log_dir = config.LOGS_DIR
@@ -99,7 +124,7 @@ load_language_resources()
 # --- 전역 서비스 인스턴스 ---
 # OllamaService는 모델 다운로드 상태를 내부적으로 관리하도록 수정되었다고 가정
 ollama_service = OllamaService()
-translator = OllamaTranslator()
+translator = OllamaTranslator(max_workers=app.config['USER_SETTINGS']['max_translation_workers'])
 pptx_handler = PptxHandler()
 excel_handler = ExcelHandler() # 새로 추가
 # ChartXmlHandler 초기화 시 ollama_service 인스턴스 전달
@@ -618,6 +643,12 @@ def cleanup_old_files_and_tasks():
             logger.error(f"Error during cleanup_old_files_and_tasks: {e}", exc_info=True)
 
 
+@app.route('/api/clear_cache', methods=['POST'])
+@error_handler
+def clear_cache_route():
+    translator.clear_translation_cache()
+    return jsonify({'message': 'Translation cache cleared successfully.'}), 200
+
 @app.route('/api/progress/<task_id>')
 def get_progress_route(task_id):
     task = tasks.get(task_id)
@@ -900,6 +931,46 @@ def get_ui_languages_route():
         'current_language': current_lang,
         'resources': language_resources.get(current_lang, {})
     })
+
+@app.route('/api/settings', methods=['GET'])
+@error_handler
+def get_settings_route():
+    return jsonify(app.config['USER_SETTINGS'])
+
+@app.route('/api/settings', methods=['POST'])
+@error_handler
+def save_settings_route():
+    data = request.json
+    if not data:
+        return jsonify({'error': 'No settings data provided.'}), 400
+
+    # 현재 설정을 가져와서 업데이트
+    current_settings = app.config['USER_SETTINGS'].copy()
+    for key, value in data.items():
+        # config.DEFAULT_ADVANCED_SETTINGS에 있는 키만 업데이트 허용
+        if key in config.DEFAULT_ADVANCED_SETTINGS:
+            # 타입 검사 (선택 사항이지만 안정성을 위해 권장)
+            if isinstance(value, type(config.DEFAULT_ADVANCED_SETTINGS[key])):
+                current_settings[key] = value
+            else:
+                logger.warning(f"Attempted to set setting '{key}' with wrong type. Expected {type(config.DEFAULT_ADVANCED_SETTINGS[key])}, got {type(value)}.")
+                # 오류를 반환하거나, 무시하거나 선택
+                # return jsonify({'error': f"Invalid type for setting '{key}'"}), 400
+        else:
+            logger.warning(f"Attempted to set unknown setting: {key}")
+
+    save_user_settings(current_settings)
+    app.config['USER_SETTINGS'] = current_settings # Flask 앱 설정 업데이트
+
+    # OllamaTranslator 인스턴스에 변경된 max_translation_workers 값 적용
+    # 이 부분은 OllamaTranslator가 런타임에 max_workers를 변경할 수 있는 메서드를 제공해야 함
+    # 현재는 생성자에서만 받으므로, 앱 재시작이 필요하거나, translator 인스턴스를 재생성해야 함.
+    # 여기서는 간단히 translator 인스턴스를 재생성하는 것으로 처리 (실제 앱에서는 더 정교한 관리 필요)
+    global translator
+    translator = OllamaTranslator(max_workers=app.config['USER_SETTINGS']['max_translation_workers'])
+    logger.info(f"Updated max_translation_workers to {app.config['USER_SETTINGS']['max_translation_workers']}")
+
+    return jsonify({'message': 'Settings saved successfully.', 'settings': current_settings})
 
 
 if __name__ == '__main__':

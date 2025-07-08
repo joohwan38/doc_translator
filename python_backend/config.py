@@ -124,10 +124,6 @@ OLLAMA_READ_TIMEOUT = 180
 OLLAMA_PULL_READ_TIMEOUT = None
 MODELS_CACHE_TTL_SECONDS = 300
 
-TRANSLATOR_TEMPERATURE_GENERAL = 0.2
-MAX_TRANSLATION_WORKERS = 4
-MAX_OCR_WORKERS = MAX_TRANSLATION_WORKERS
-
 MIN_MEANINGFUL_CHAR_RATIO_SKIP = 0.1
 MIN_MEANINGFUL_CHAR_RATIO_OCR = 0.1
 
@@ -141,7 +137,8 @@ UI_PROGRESS_UPDATE_INTERVAL = 0.2
 DEFAULT_ADVANCED_SETTINGS = {
     "ocr_temperature": 0.4,
     "image_translation_enabled": True,
-    "ocr_use_gpu": False
+    "ocr_use_gpu": False,
+    "max_translation_workers": 4 # 여기에 추가
 }
 
 # 파일 및 작업 정리 관련 설정

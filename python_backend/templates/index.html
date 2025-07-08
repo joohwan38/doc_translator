@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<html lang="ko"> <head>
+<html lang="ko">
+<head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Document Translator</title>
@@ -147,7 +148,7 @@
             display: none; 
         }
 
-        select, button, input[type="range"], input[type="checkbox"]+label {
+        select, button, input[type="range"], input[type="checkbox"]+label, input[type="number"] {
             width: 100%;
             padding: 8px;
             border: 1px solid #ccc;
@@ -448,10 +449,12 @@
         </header>
         
         <div class="main-content">
-            <div class="panel"> <h2 data-i18n="file_select_title">File Selection</h2>
+            <div class="panel">
+                <h2 data-i18n="file_select_title">File Selection</h2>
                 <div class="form-group">
                     <div class="file-upload">
-                        <input type="file" id="file-input" accept=".pptx,.xlsx"> <label for="file-input" class="file-upload-label" data-i18n="file_upload_label">
+                        <input type="file" id="file-input" accept=".pptx,.xlsx">
+                        <label for="file-input" class="file-upload-label" data-i18n="file_upload_label">
                             Select or drag and drop a PowerPoint file here
                         </label>
                     </div>
@@ -466,7 +469,8 @@
                 </div>
             </div>
             
-            <div class="panel"> <h2 data-i18n="translation_options_title">Translation Options</h2>
+            <div class="panel">
+                <h2 data-i18n="translation_options_title">Translation Options</h2>
                 <div class="form-group language-selection-area">
                     <div class="language-column">
                         <label for="src-lang" data-i18n="source_language_label_short">Source Language</label>
@@ -505,12 +509,19 @@
                             <span class="slider-value" id="ocr-temp-value">0.4</span>
                         </div>
                     </div>
+                    <!-- NEW: Max Translation Workers Setting -->
+                    <div class="form-group">
+                        <label for="max-translation-workers" data-i18n="max_translation_workers_label">Max Translation Workers</label>
+                        <input type="number" id="max-translation-workers" min="1" value="4">
+                    </div>
+                    <button id="save-advanced-settings-btn" data-i18n="save_settings_button" style="margin-top: 10px;">Save Advanced Settings</button>
                 </div>
                 <div class="translation-actions-container" style="display: flex; flex-direction: row; gap: 10px; margin-top: 10px;">
                     <button id="start-translate-btn" data-i18n="start_translation_button" style="flex-grow: 1;">번역 시작</button>
                     <button id="action-btn" style="flex-grow: 1; display: none;"></button>
                 </div>
-            </div> <div class="panel full-width" id="progress-panel" style="display: none;">
+            </div>
+            <div class="panel full-width" id="progress-panel" style="display: none;">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                     <h2 data-i18n="translation_progress_title">Translation Progress</h2>
                 </div>
@@ -536,15 +547,21 @@
                 <div id="history-tab" class="tab-content">
                     <table class="history-table">
                         <thead><tr>
-                            <th data-i18n="history_col_filename">Filename</th> <th data-i18n="history_col_source">Source</th>
-                            <th data-i18n="history_col_target">Target</th> <th data-i18n="history_col_model">Model</th>
-                            <th data-i18n="history_col_status">Status</th> <th data-i18n="history_col_time">Time</th>
+                            <th data-i18n="history_col_filename">Filename</th>
+                            <th data-i18n="history_col_source">Source</th>
+                            <th data-i18n="history_col_target">Target</th>
+                            <th data-i18n="history_col_model">Model</th>
+                            <th data-i18n="history_col_status">Status</th>
+                            <th data-i18n="history_col_time">Time</th>
                         </tr></thead>
                         <tbody id="history-body"></tbody>
                     </table>
                 </div>
-                <button id="openLogFolderBtn" style="margin-top: 10px;">Open Log Folder</button> </div>
-        </div> </div> <div id="custom-modal" class="modal-overlay" style="display: none;">
+                <button id="openLogFolderBtn" style="margin-top: 10px;">Open Log Folder</button>
+            </div>
+        </div>
+    </div>
+    <div id="custom-modal" class="modal-overlay" style="display: none;">
         <div class="modal-content">
             <h3 id="modal-title" data-i18n="modal_title_default">Confirmation</h3>
             <p id="modal-message" data-i18n="modal_message_default">Are you sure?</p>
@@ -585,7 +602,7 @@
             AWAITING_DOWNLOAD_CONFIRMATION: 'awaiting_download_confirmation',
             DOWNLOAD_COMPLETED_CAN_OPEN_FOLDER: 'download_completed_can_open_folder'
         };
-        let currentAppState = APP_STATE.IDLE;
+        let currentAppState = APP_STATE.IDNLE;
 
         // Modal callback storage
         let modalConfirmCallback = null;
@@ -631,6 +648,9 @@
             appTitle: document.getElementById('app-title'),
             imageTranslationCheckbox: document.getElementById('image-translation'),
             ocrGpuCheckbox: document.getElementById('ocr-gpu'),
+            // NEW
+            maxTranslationWorkersInput: document.getElementById('max-translation-workers'),
+            saveAdvancedSettingsBtn: document.getElementById('save-advanced-settings-btn'),
             customModal: document.getElementById('custom-modal'),
             modalTitle: document.getElementById('modal-title'),
             modalMessage: document.getElementById('modal-message'),
@@ -682,6 +702,7 @@
                 document.documentElement.lang = currentUILocale.split('-')[0];
                 console.log(`[Localization] Current language: ${currentUILocale}`);
                 applyLocalization();
+                await loadAdvancedSettings(); // Call to load advanced settings after localization
             } catch (error) {
                 console.error('[Localization] Exception during language resource loading:', error);
                 i18nResources = {};
@@ -745,7 +766,7 @@
             const langOptionsMap = { "ko": "translation_lang_ko", "en": "translation_lang_en", "ja": "translation_lang_ja", "zh-CN": "translation_lang_zh_CN", "zh-TW": "translation_lang_zh_TW", "th": "translation_lang_th", "es": "translation_lang_es" };
             [domElements.sourceLangSelect, domElements.targetLangSelect].forEach(selectElement => {
                 if (!selectElement) { console.warn("Language select dropdown not found for update."); return; }
-                const currentSelectedValue = selectElement.value;
+                const currentSelectedValue = selectElement.value; domElements.modelSelect.innerHTML = '';
                 selectElement.innerHTML = '';
                 Object.keys(langOptionsMap).forEach(langCode => {
                     const option = document.createElement('option');
@@ -865,7 +886,8 @@
                     domElements.startTranslateButton.textContent = (i18nResources && i18nResources.start_translation_button) || "번역 시작";
                     if (fileReady && sourceLangSelected && targetLangSelected && modelSelected && ollamaRunning && !isModelInstallationInProgress) {
                         domElements.startTranslateButton.disabled = false;
-                    } else {
+                    }
+                    else {
                         domElements.startTranslateButton.disabled = true;
                     }
                     translatedFileAvailableButNotDownloaded = true;
@@ -881,7 +903,8 @@
                     domElements.startTranslateButton.textContent = (i18nResources && i18nResources.start_translation_button) || "번역 시작";
                      if (fileReady && sourceLangSelected && targetLangSelected && modelSelected && ollamaRunning && !isModelInstallationInProgress) {
                         domElements.startTranslateButton.disabled = false;
-                    } else {
+                    }
+                    else {
                         domElements.startTranslateButton.disabled = true;
                     }
 
@@ -1072,13 +1095,6 @@
                     let statusMessage = progressData.status;
                     const statusKey = `model_pull_status_${progressData.status.toLowerCase().replace(/\s+/g, '_')}`;
                     if (i18nResources && i18nResources[statusKey]) { statusMessage = i18nResources[statusKey]; }
-                    else if (progressData.status === "downloading" && progressData.total > 0 && progressData.completed >=0) {
-                        statusMessage = ((i18nResources && i18nResources.model_pull_status_downloading_details) || "다운로드 중 ({completedMB}MB / {totalMB}MB)")
-                            .replace("{completedMB}", (progressData.completed / 1024 / 1024).toFixed(1))
-                            .replace("{totalMB}", (progressData.total / 1024 / 1024).toFixed(1));
-                    }
-                    domElements.modelInstallMessage.textContent = statusMessage;
-                    if (progressData.total > 0 && progressData.completed >= 0) { const percentage = Math.round((progressData.completed / progressData.total) * 100); domElements.modelInstallProgressFill.style.width = `${percentage}%`; domElements.modelInstallProgressFill.textContent = `${percentage}%`; }
                     else if (progressData.status && (progressData.status.toLowerCase().includes("downloading") || progressData.status.toLowerCase().includes("pulling") || progressData.status.toLowerCase().includes("starting"))) { domElements.modelInstallProgressFill.style.width = '100%'; domElements.modelInstallProgressFill.textContent = ''; }
                     if (progressData.error) { addLog('log_model_pull_error', true, 'error', { modelName: modelName, details: progressData.error }); modelPullEventSource.close(); isModelInstallationInProgress = false; domElements.modelInstallationStatus.style.display = 'none'; setMainButtonState(APP_STATE.IDLE); checkOllamaStatus(); }
                     else if (progressData.done) { addLog('log_model_pull_success', true, 'success', { modelName: modelName }); modelPullEventSource.close(); isModelInstallationInProgress = false; domElements.modelInstallationStatus.style.display = 'none'; setMainButtonState(APP_STATE.IDLE); checkOllamaStatus(); }
@@ -1114,9 +1130,9 @@
         function confirmAndProceedWithNewTask(actionCallback, revertAction = null) {
             if (translatedFileAvailableButNotDownloaded || currentAppState === APP_STATE.DOWNLOAD_COMPLETED_CAN_OPEN_FOLDER ) {
                 let messageKey = 'modal_new_task_message';
-                 if (currentAppState === APP_STATE.COMPLETED_SUCCESS){ // 다운로드 버튼이 보일 때
+                 if (currentAppState === APP_STATE.COMPLETED_SUCCESS){
                     messageKey = 'modal_new_task_undownloaded_message';
-                } else if (currentAppState === APP_STATE.DOWNLOAD_COMPLETED_CAN_OPEN_FOLDER) { // 폴더열기 버튼이 보일 때
+                } else if (currentAppState === APP_STATE.DOWNLOAD_COMPLETED_CAN_OPEN_FOLDER) {
                     messageKey = 'modal_new_task_after_download_message';
                 }
 
@@ -1133,22 +1149,10 @@
                     onCancel: () => {
                         addLog('log_user_cancelled_new_task', true, 'info');
                         if (revertAction) { revertAction(); }
-                        // 사용자가 취소했으므로, 이전 상태(버튼 모양 포함)를 유지해야 함.
-                        // setMainButtonState(currentAppState); // 현재 상태를 다시 호출하여 UI를 이전 상태로 유지.
-                        // 또는, updateMainButtonState()를 직접 호출할 수도 있음.
-                        // 하지만, 모달이 닫힐 때 AWAITING_DOWNLOAD_CONFIRMATION 상태에서
-                        // 이전 상태로 돌아가는 로직이 closeModal이나 모달 버튼 콜백에 명확히 있어야 함.
-                        // 현재는 closeModal에서 특별한 상태 변경을 하지 않으므로,
-                        // onCancel 콜백에서 이전 상태로 돌려주는 것이 안전.
-                        // 예를 들어, 이전 상태가 COMPLETED_SUCCESS 였다면 해당 상태로.
-                        // 이 부분은 좀 더 정교한 상태 관리가 필요할 수 있음.
-                        // 지금은 revertAction() 후 updateMainButtonState()가 호출될 것을 기대.
                         if (currentAppState === APP_STATE.AWAITING_DOWNLOAD_CONFIRMATION) {
-                            // 모달이 닫히면서 원래 상태로 돌아가야 함.
-                            // translatedFileAvailableButNotDownloaded 플래그에 따라 상태 결정
-                            if(translatedFileAvailableButNotDownloaded && lastDownloadedTaskId) { // 다운로드 안한 파일 있음
+                            if(translatedFileAvailableButNotDownloaded && lastDownloadedTaskId) {
                                 setMainButtonState(APP_STATE.COMPLETED_SUCCESS);
-                            } else if (lastDownloadedTaskId) { // 다운로드는 했고 폴더 열기 가능 상태였음
+                            } else if (lastDownloadedTaskId) {
                                 setMainButtonState(APP_STATE.DOWNLOAD_COMPLETED_CAN_OPEN_FOLDER);
                             } else {
                                 setMainButtonState(APP_STATE.IDLE);
@@ -1342,7 +1346,9 @@
                 ocr_temperature: parseFloat(domElements.ocrTemperatureSlider.value),
                 ocr_use_gpu: domElements.ocrGpuCheckbox.checked,
                 ui_language: currentUILocale,
-                ooriginal_folder_path: currentOriginalFilePath
+                ooriginal_folder_path: currentOriginalFilePath,
+                // NEW: Add max_translation_workers to payload
+                max_translation_workers: parseInt(domElements.maxTranslationWorkersInput.value, 10)
             };
             try {
                 const response = await fetch('/api/translate', {
@@ -1363,6 +1369,65 @@
                 if(domElements.progressPanel) domElements.progressPanel.style.display = 'none';
             }
         }
+
+        // NEW: Function to load advanced settings from backend
+        async function loadAdvancedSettings() {
+            try {
+                const response = await fetch(`/api/settings?lang=${currentUILocale}`);
+                if (!response.ok) {
+                    throw new Error(`Failed to load advanced settings: ${response.status}`);
+                }
+                const settings = await response.json();
+                console.log("Loaded advanced settings:", settings);
+
+                if (domElements.ocrTemperatureSlider) domElements.ocrTemperatureSlider.value = settings.ocr_temperature || 0.4;
+                if (domElements.ocrTemperatureValueDisplay) domElements.ocrTemperatureValueDisplay.textContent = settings.ocr_temperature || 0.4;
+                if (domElements.imageTranslationCheckbox) domElements.imageTranslationCheckbox.checked = settings.image_translation_enabled !== undefined ? settings.image_translation_enabled : true;
+                if (domElements.ocrGpuCheckbox) domElements.ocrGpuCheckbox.checked = settings.ocr_use_gpu !== undefined ? settings.ocr_use_gpu : false;
+                // NEW: Populate max_translation_workers
+                if (domElements.maxTranslationWorkersInput) domElements.maxTranslationWorkersInput.value = settings.max_translation_workers || 4;
+
+            } catch (error) {
+                console.error("Error loading advanced settings:", error);
+                addLog('error_loading_advanced_settings', true, 'error', { message: error.message });
+            }
+        }
+
+        // NEW: Function to save advanced settings to backend
+        async function saveAdvancedSettings() {
+            const settingsToSave = {
+                ocr_temperature: parseFloat(domElements.ocrTemperatureSlider.value),
+                image_translation_enabled: domElements.imageTranslationCheckbox.checked,
+                ocr_use_gpu: domElements.ocrGpuCheckbox.checked,
+                max_translation_workers: parseInt(domElements.maxTranslationWorkersInput.value, 10) // NEW
+            };
+
+            // Basic validation for max_translation_workers
+            if (isNaN(settingsToSave.max_translation_workers) || settingsToSave.max_translation_workers < 1) {
+                alert((i18nResources && i18nResources.error_invalid_max_workers) || "Max Translation Workers must be a positive integer.");
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(settingsToSave)
+                });
+                const data = await response.json();
+                if (response.ok) {
+                    addLog('log_settings_saved_successfully', true, 'success');
+                    alert((i18nResources && i18nResources.settings_saved_success) || "설정이 성공적으로 저장되었습니다.");
+                } else {
+                    throw new Error(data.error || ((i18nResources && i18nResources.error_saving_settings) || "설정 저장에 실패했습니다."));
+                }
+            } catch (error) {
+                console.error("Error saving advanced settings:", error);
+                addLog('error_saving_advanced_settings', true, 'error', { message: error.message });
+                alert((i18nResources && i18nResources.error_saving_settings_alert) || `설정 저장 중 오류 발생: ${error.message}`);
+            }
+        }
+
 
         // --- Event Listeners Setup ---
         function setupEventListeners() {
@@ -1485,7 +1550,7 @@
                                 const result = await window.electronAPI.saveTranslatedFile({
                                     tempFilePath: currentTaskTempOutputPath,
                                     originalPath: currentOriginalFilePath,
-                                    targetLang: domElements.targetLangSelect.value // 이 줄을 추가하세요
+                                    targetLang: domElements.targetLangSelect.value 
                                 });
 
                                 if (result && result.success) {
@@ -1559,7 +1624,7 @@
                     if (currentAppState === APP_STATE.AWAITING_DOWNLOAD_CONFIRMATION) {
                         if (translatedFileAvailableButNotDownloaded && lastDownloadedTaskId) {
                             setMainButtonState(APP_STATE.COMPLETED_SUCCESS);
-                        } else if (lastDownloadedTaskId) { // 다운로드는 했고 폴더 열기 가능 상태였음
+                        } else if (lastDownloadedTaskId) {
                             setMainButtonState(APP_STATE.DOWNLOAD_COMPLETED_CAN_OPEN_FOLDER);
                         } else {
                             setMainButtonState(APP_STATE.IDLE);
@@ -1577,7 +1642,7 @@
             if (domElements.customModal) {
                 domElements.customModal.addEventListener('click', (event) => {
                     if (event.target === domElements.customModal) {
-                        if (modalCancelCallback) { // 오버레이 클릭 시 취소 콜백 실행
+                        if (modalCancelCallback) {
                              modalCancelCallback();
                         }
                         closeModal();
