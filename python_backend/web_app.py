@@ -533,7 +533,10 @@ def translate_excel_worker(task_id, filepath, src_lang, tgt_lang, model):
         if file_info.get("error"):
             raise Exception(file_info["error"])
 
-        task.total_estimated_work = (file_info.get("translatable_cell_count", 0) * config.WEIGHT_EXCEL_CELL) # config에 WEIGHT_EXCEL_CELL = 1 추가 권장
+        task.total_estimated_work = (
+            (file_info.get("total_text_char_count", 0) * config.WEIGHT_TEXT_CHAR) + 
+            (file_info.get("translatable_cell_count", 0) * config.WEIGHT_EXCEL_CELL)
+        )
         if task.total_estimated_work <= 0: task.total_estimated_work = 1
 
         src_lang_name = config.TRANSLATION_LANGUAGES_MAP.get(src_lang, src_lang)

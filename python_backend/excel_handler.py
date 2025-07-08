@@ -162,6 +162,7 @@ class ExcelHandler(AbsExcelProcessor):
                     # 셀 값 및 스타일 복사
                     for row in source_sheet.iter_rows():
                         for cell in row:
+                            if not hasattr(cell, 'coordinate'): continue
                             new_cell = target_sheet.cell(row=cell.row, column=cell.column)
                             if (sheet_name, cell.coordinate) in translated_map:
                                 translated_text = translated_map[(sheet_name, cell.coordinate)]
@@ -178,6 +179,7 @@ class ExcelHandler(AbsExcelProcessor):
                         for merged_range in merged_cell_ranges_map[sheet_name]:
                             target_sheet.merge_cells(merged_range)
                 
+                if progress_callback: progress_callback("File", "status_task_saving_file", 0, os.path.basename(output_path))
                 new_workbook.save(output_path)
 
             else:
@@ -187,10 +189,13 @@ class ExcelHandler(AbsExcelProcessor):
                     sheet = workbook_to_save[sheet_name]
                     for row in sheet.iter_rows():
                         for cell in row:
+                            if not hasattr(cell, 'coordinate'): continue
                             if (sheet_name, cell.coordinate) in translated_map:
                                 translated_text = translated_map[(sheet_name, cell.coordinate)]
                                 if "오류:" not in translated_text:
                                     cell.value = translated_text
+                
+                if progress_callback: progress_callback("File", "status_task_saving_file", 0, os.path.basename(output_path))
                 workbook_to_save.save(output_path)
 
             logger.info(f"번역된 엑셀 파일 저장 완료: {output_path}")
