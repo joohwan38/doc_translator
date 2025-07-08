@@ -4,6 +4,7 @@ from openpyxl.cell import Cell
 from openpyxl.styles import Font, PatternFill, Border, Alignment, Side, Protection
 from copy import copy
 import logging
+import shutil
 import traceback
 from typing import Dict, Any, Optional, Callable, List
 
@@ -71,27 +72,42 @@ class ExcelHandler(AbsExcelProcessor):
                            ollama_service: 'AbsOllamaService',
                            progress_callback: Optional[Callable[[Any, str, float, str], None]] = None,
                            stop_event: Optional[Any] = None) -> Optional[str]:
-        """워크북의 모든 텍스트를 번역하고 새 파일로 저장합니다."""
+        temp_input_path = None
         try:
-            original_workbook = openpyxl.load_workbook(file_path, read_only=True, data_only=True, keep_vba=False)
+            # 1. 원본 파일을 임시 파일로 복사하여 작업 (읽기/쓰기 동시 수행 위함)
+            temp_input_path = os.path.join(os.path.dirname(output_path), f"temp_{os.path.basename(file_path)}")
+            shutil.copy2(file_path, temp_input_path)
+
+            workbook = openpyxl.load_workbook(temp_input_path)
             
-            # 1. 번역할 텍스트 추출
+            # 2. 번역할 텍스트 추출 (병합 셀 고려)
             texts_to_translate = []
             cell_map = [] # (sheet_name, cell_coordinate)
-            for sheet_name in original_workbook.sheetnames:
-                sheet = original_workbook[sheet_name]
+            merged_cell_ranges_map = {sheet.title: [str(merged_range) for merged_range in sheet.merged_cells.ranges] for sheet in workbook.worksheets}
+
+            for sheet_name in workbook.sheetnames:
+                sheet = workbook[sheet_name]
+                merged_cells_in_sheet = set()
+                for merged_range in merged_cell_ranges_map.get(sheet_name, []):
+                    for row in sheet[merged_range]:
+                        for cell in row:
+                            merged_cells_in_sheet.add(cell.coordinate)
+
                 for row in sheet.iter_rows():
                     for cell in row:
+                        if cell.coordinate in merged_cells_in_sheet and not any(cell.coordinate in r for r in sheet.merged_cells.ranges if sheet[r.split(':')[0]].coordinate == cell.coordinate):
+                            continue # 병합된 셀의 첫번째 셀이 아니면 건너뛰기
+
                         if cell.value and isinstance(cell.value, str) and cell.value.strip():
                             texts_to_translate.append(cell.value)
                             cell_map.append((sheet_name, cell.coordinate))
 
             if not texts_to_translate:
                 logger.info("엑셀 파일에 번역할 텍스트가 없습니다. 원본을 복사합니다.")
-                original_workbook.save(output_path)
+                shutil.copy2(file_path, output_path)
                 return output_path
 
-            # 2. 텍스트 일괄 번역 (기존 번역기 재사용)
+            # 3. 텍스트 일괄 번역
             if progress_callback:
                 progress_callback("Excel", "status_task_translating_cells", 0, f"Translating {len(texts_to_translate)} cells...")
 
@@ -106,9 +122,7 @@ class ExcelHandler(AbsExcelProcessor):
             if stop_event and stop_event.is_set():
                 logger.info("엑셀 번역 작업이 중단되었습니다.")
                 # 중단 시 현재까지 번역된 내용으로 저장 시도
-                translated_map = {cell_map[i]: translated_texts[i] for i in range(len(translated_texts))}
-                self._write_translated_data(original_workbook, translated_map, output_path, stop_event)
-                return output_path
+                # ... (중단 시 저장 로직은 아래에서 통합)
 
             if len(texts_to_translate) != len(translated_texts):
                 logger.error("원본 텍스트와 번역된 텍스트의 개수가 일치하지 않습니다.")
@@ -116,13 +130,32 @@ class ExcelHandler(AbsExcelProcessor):
 
             translated_map = {cell_map[i]: translated_texts[i] for i in range(len(translated_texts))}
 
-            # 3. 번역된 내용을 새 워크북에 쓰기
-            self._write_translated_data(original_workbook, translated_map, output_path, stop_event, progress_callback, len(texts_to_translate))
-
+            # 4. 번역된 내용을 워크북에 직접 쓰기
+            weight_per_cell = config.WEIGHT_EXCEL_CELL if hasattr(config, 'WEIGHT_EXCEL_CELL') else 1
+            for sheet_name in workbook.sheetnames:
+                if stop_event and stop_event.is_set(): break
+                sheet = workbook[sheet_name]
+                for row in sheet.iter_rows():
+                    if stop_event and stop_event.is_set(): break
+                    for cell in row:
+                        if (sheet_name, cell.coordinate) in translated_map:
+                            translated_text = translated_map[(sheet_name, cell.coordinate)]
+                            if "오류:" not in translated_text:
+                                cell.value = translated_text
+                            
+                            if progress_callback:
+                                progress_callback(
+                                    f"Sheet: {sheet_name}", 
+                                    "Applying translation",
+                                    weight_per_cell,
+                                    f"Cell {cell.coordinate}"
+                                )
+            
+            workbook.save(output_path)
+            logger.info(f"번역된 엑셀 파일 저장 완료: {output_path}")
             return output_path
 
         except KeyError as ke:
-            # 'xl/drawings/NULL'과 같은 특정 KeyError를 처리
             if "xl/drawings/NULL" in str(ke):
                 logger.error(f"엑셀 파일 번역 중 오류: 파일 내 드로잉 요소 문제로 로드 실패. 다른 엑셀 파일을 시도하거나, 파일에서 드로잉 요소를 제거 후 다시 시도해주세요. 오류: {ke}", exc_info=True)
             else:
@@ -131,31 +164,11 @@ class ExcelHandler(AbsExcelProcessor):
         except Exception as e:
             logger.error(f"엑셀 파일 번역 중 오류: {e}", exc_info=True)
             return None
+        finally:
+            if temp_input_path and os.path.exists(temp_input_path):
+                try:
+                    os.remove(temp_input_path)
+                except OSError as e:
+                    logger.warning(f"임시 엑셀 파일 삭제 실패: {e}")
 
-    def _write_translated_data(self, workbook, translated_map, output_path, stop_event, progress_callback=None, total_cells=1):
-        """번역된 데이터를 워크북에 기록합니다."""
-        processed_cells = 0
-        weight_per_cell = config.WEIGHT_EXCEL_CELL if hasattr(config, 'WEIGHT_EXCEL_CELL') else 1
-
-        for sheet_name in workbook.sheetnames:
-            if stop_event and stop_event.is_set(): break
-            sheet = workbook[sheet_name]
-            for row in sheet.iter_rows():
-                if stop_event and stop_event.is_set(): break
-                for cell in row:
-                    if (sheet_name, cell.coordinate) in translated_map:
-                        translated_text = translated_map[(sheet_name, cell.coordinate)]
-                        if "오류:" not in translated_text:
-                            cell.value = translated_text
-                        
-                        processed_cells += 1
-                        if progress_callback:
-                            progress_callback(
-                                f"Sheet: {sheet_name}", 
-                                "Applying translation",
-                                weight_per_cell,
-                                f"Cell {cell.coordinate}"
-                            )
-        
-        workbook.save(output_path)
-        logger.info(f"번역된 엑셀 파일 저장 완료: {output_path}")
+    
