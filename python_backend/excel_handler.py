@@ -157,13 +157,11 @@ class ExcelHandler(AbsExcelProcessor):
             return output_path
 
         except KeyError as ke:
+            # 'xl/drawings/NULL'과 같은 특정 KeyError를 처리
             if "xl/drawings/NULL" in str(ke):
                 logger.error(f"엑셀 파일 번역 중 오류: 파일 내 드로잉 요소 문제로 로드 실패. 다른 엑셀 파일을 시도하거나, 파일에서 드로잉 요소를 제거 후 다시 시도해주세요. 오류: {ke}", exc_info=True)
             else:
                 logger.error(f"엑셀 파일 번역 중 알 수 없는 KeyError 발생: {ke}", exc_info=True)
-            return None
-        except Exception as e:
-            logger.error(f"엑셀 파일 번역 중 오류: {e}", exc_info=True)
             return None
         finally:
             if temp_input_path and os.path.exists(temp_input_path):
