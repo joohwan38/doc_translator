@@ -113,6 +113,8 @@ class ExcelHandler(AbsExcelProcessor):
 
                 for row in sheet.iter_rows():
                     for cell in row:
+                        if not hasattr(cell, 'coordinate'): continue # EmptyCell 방지
+
                         # 병합된 셀의 첫번째가 아니면 건너뛰기 (병합 정보가 정확할 때만 유효)
                         if cell.coordinate in merged_cells_in_sheet:
                             is_start_cell = False
