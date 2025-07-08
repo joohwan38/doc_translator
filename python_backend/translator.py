@@ -1,7 +1,7 @@
 # translator.py
 import logging
 import time
-from typing import Optional, List, Dict, Any, Tuple
+from typing import Optional, List, Dict, Any, Tuple, Callable
 import requests
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import threading
