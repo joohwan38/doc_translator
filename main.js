@@ -6,6 +6,10 @@ const { spawn } = require('node:child_process');
 const fs = require('node:fs');
 const findFreePort = require('find-free-port');
 
+// package.json에서 버전 정보 로드
+const packageJson = require('./package.json');
+const appVersion = packageJson.version;
+
 let mainWindow;
 let pythonProcess = null;
 let flaskPort = 5001; // 기본 포트, findFreePort로 실제 사용 포트 결정
@@ -315,6 +319,8 @@ app.on('quit', () => {
 
 // IPC Handlers
 ipcMain.handle('get-flask-port', async () => flaskPort);
+
+ipcMain.handle('get-app-version', async () => appVersion);
 
 ipcMain.handle('open-log-folder', async () => {
     if (LOGS_DIR && fs.existsSync(LOGS_DIR)) {

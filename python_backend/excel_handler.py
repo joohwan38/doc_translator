@@ -74,11 +74,13 @@ class ExcelHandler(AbsExcelProcessor):
                            progress_callback: Optional[Callable[[Any, str, float, str], None]] = None,
                            stop_event: Optional[Any] = None) -> Optional[str]:
         temp_input_path = None
+        workbook = None # Initialize workbook
         try:
             # 1. 번역할 텍스트 추출 (읽기 전용으로 먼저 시도)
             texts_to_translate = []
             cell_map = []
             merged_cell_ranges_map = {}
+            sheet_name_original_order = [] # To maintain order and map translated names back
             
             try:
                 # 드로잉 요소 문제 없는 대부분의 파일을 위해 읽기/쓰기 모드로 먼저 시도
@@ -94,6 +96,18 @@ class ExcelHandler(AbsExcelProcessor):
                     is_read_only_fallback = True
                 else:
                     raise # 다른 KeyError는 다시 발생시킴
+            except Exception as e: # Catch any other exception during initial load
+                logger.error(f"엑셀 파일 초기 로드 중 예상치 못한 오류 발생: {e}", exc_info=True)
+                workbook = None # Ensure workbook is None if an error occurs
+
+            if workbook is None:
+                logger.error(f"엑셀 파일 '{file_path}'을(를) 로드하는 데 실패했습니다. 파일이 손상되었거나 지원되지 않는 형식일 수 있습니다.")
+                return None # Indicate failure
+
+            # Add sheet names to translation queue
+            for sheet_name in workbook.sheetnames:
+                texts_to_translate.append(sheet_name)
+                sheet_name_original_order.append(sheet_name)
 
             for sheet in workbook.worksheets:
                 sheet_name = sheet.title
@@ -144,7 +158,13 @@ class ExcelHandler(AbsExcelProcessor):
             if stop_event and stop_event.is_set(): logger.info("엑셀 번역 작업이 중단되었습니다.")
             if len(texts_to_translate) != len(translated_texts): raise ValueError("번역된 텍스트와 원본 텍스트의 개수가 불일치합니다.")
 
-            translated_map = {cell_map[i]: translated_texts[i] for i in range(len(translated_texts))}
+            # Separate translated sheet names from translated cell values
+            num_sheets = len(sheet_name_original_order)
+            translated_sheet_names = translated_texts[:num_sheets]
+            translated_cell_texts = translated_texts[num_sheets:]
+
+            translated_sheet_name_map = {sheet_name_original_order[i]: translated_sheet_names[i] for i in range(num_sheets)}
+            translated_map = {cell_map[i]: translated_cell_texts[i] for i in range(len(translated_cell_texts))}
 
             # 3. 번역된 내용을 워크북에 쓰기
             if is_read_only_fallback:
@@ -157,7 +177,8 @@ class ExcelHandler(AbsExcelProcessor):
 
                 for sheet_name in workbook.sheetnames:
                     source_sheet = workbook[sheet_name]
-                    target_sheet = new_workbook.create_sheet(title=sheet_name)
+                    translated_sheet_title = translated_sheet_name_map.get(sheet_name, sheet_name) # Get translated name, fallback to original
+                    target_sheet = new_workbook.create_sheet(title=translated_sheet_title) # Use translated title
 
                     # 셀 값 및 스타일 복사
                     for row in source_sheet.iter_rows():
@@ -174,6 +195,11 @@ class ExcelHandler(AbsExcelProcessor):
                                 new_cell.value = cell.value
                             copy_cell_style(cell, new_cell)
                     
+                    # 컬럼 너비 복사
+                    for col_idx, column_dimension in source_sheet.column_dimensions.items():
+                        if column_dimension.width is not None:
+                            target_sheet.column_dimensions[col_idx].width = column_dimension.width
+
                     # 병합 정보 복사
                     if sheet_name in merged_cell_ranges_map:
                         for merged_range in merged_cell_ranges_map[sheet_name]:
@@ -185,15 +211,23 @@ class ExcelHandler(AbsExcelProcessor):
             else:
                 # 일반 모드였으면, 기존 워크북에 직접 수정 후 저장
                 workbook_to_save = workbook
+                
+                # Update cell values first
                 for sheet_name in workbook_to_save.sheetnames:
                     sheet = workbook_to_save[sheet_name]
                     for row in sheet.iter_rows():
                         for cell in row:
                             if not hasattr(cell, 'coordinate'): continue
-                            if (sheet_name, cell.coordinate) in translated_map:
+                            if (sheet_name, cell.coordinate) in translated_map: # Use original sheet_name for lookup
                                 translated_text = translated_map[(sheet_name, cell.coordinate)]
                                 if "오류:" not in translated_text:
                                     cell.value = translated_text
+                
+                # Then rename sheets
+                for sheet_name_original in sheet_name_original_order: # Iterate through original names
+                    sheet = workbook_to_save[sheet_name_original] # Get sheet by original name
+                    translated_sheet_title = translated_sheet_name_map.get(sheet_name_original, sheet_name_original)
+                    sheet.title = translated_sheet_title # Set new title
                 
                 if progress_callback: progress_callback("File", "status_task_saving_file", 0, os.path.basename(output_path))
                 workbook_to_save.save(output_path)

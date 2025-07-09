@@ -738,7 +738,20 @@
             });
 
             if (elementScope === document) {
-                if(domElements.appTitle) domElements.appTitle.textContent = (i18nResources && i18nResources.app_title) || 'Document Translator';
+                if(domElements.appTitle) {
+                    const baseTitle = (i18nResources && i18nResources.app_title) || 'Document Translator';
+                    // Electron API를 통해 버전 정보를 가져옵니다.
+                    if (window.electronAPI && window.electronAPI.getAppVersion) {
+                        window.electronAPI.getAppVersion().then(version => {
+                            domElements.appTitle.textContent = `${baseTitle} v${version}`;
+                        }).catch(error => {
+                            console.error("Failed to get app version:", error);
+                            domElements.appTitle.textContent = baseTitle; // 오류 발생 시 기본 타이틀 사용
+                        });
+                    } else {
+                        domElements.appTitle.textContent = baseTitle;
+                    }
+                }
                 updateTranslationLanguageOptions();
                 updateOllamaStatusDisplay();
                 updateMainButtonState(); // 버튼 상태 업데이트
@@ -1474,7 +1487,12 @@
                     });
                 }
             });
-            if(domElements.ocrTemperatureSlider && domElements.ocrTemperatureValueDisplay) { domElements.ocrTemperatureSlider.addEventListener('input', (e) => { domElements.ocrTemperatureValueDisplay.textContent = e.target.value; });}
+            if(domElements.ocrTemperatureSlider && domElements.ocrTemperatureValueDisplay) {
+                domElements.ocrTemperatureSlider.addEventListener('input', (e) => {
+                    // 소수점 첫째 자리까지 표시하도록 수정
+                    domElements.ocrTemperatureValueDisplay.textContent = parseFloat(e.target.value).toFixed(1);
+                });
+            }
 
             if(domElements.startTranslateButton) {
                 domElements.startTranslateButton.addEventListener('click', async () => {

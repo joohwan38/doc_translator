@@ -5,5 +5,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     openLogFolder: () => ipcRenderer.invoke('open-log-folder'),
     deleteTranslationHistory: () => ipcRenderer.invoke('delete-translation-history'),
     openOutputFolder: () => ipcRenderer.invoke('open-output-folder'),
-    saveTranslatedFile: (options) => ipcRenderer.invoke('save-translated-file', options)
+    saveTranslatedFile: (options) => ipcRenderer.invoke('save-translated-file', options),
+    getAppVersion: () => ipcRenderer.invoke('get-app-version')
 });
